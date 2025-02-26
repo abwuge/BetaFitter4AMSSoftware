@@ -1,0 +1,9 @@
+# Ignore build files
+build/*
+
+# Ignore GitHub Copilot prompts
+.github/prompts/*
+.github/.copilot*
+
+# Ignore IDE files
+.vscode/*
