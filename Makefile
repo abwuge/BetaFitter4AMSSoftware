@@ -19,13 +19,12 @@ ifneq ($(findstring g,$(CXX)),g)
 endif
 
 # Handle build flags
-ifeq ($(FLAG),debug)
-  OPTFLAGS:=-O0 -g
-  CERNLIB:=-L/cvmfs/ams.cern.ch/Offline/CERN/2005/lib -lpacklib -lmathlib -lkernlib
-else
-  OPTFLAGS:=-O3
-  CERNLIB:=
-endif
+debug: OPTFLAGS:=-O0 -g
+debug: CERNLIB:=-L/cvmfs/ams.cern.ch/Offline/CERN/2005/lib -lpacklib -lmathlib -lkernlib
+debug: all
+
+OPTFLAGS?=-O3
+CERNLIB?=
 
 #----
 VERSION6     := $(shell $(ROOTSYS)/bin/root-config --version | cut -b1-1)

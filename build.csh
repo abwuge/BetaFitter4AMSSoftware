@@ -29,7 +29,7 @@ echo "build AMSVX..."
 echo
 set current_dir=`pwd`
 cd $AMSWD/install/
-make debug_static PGTRACK=1
+make debug_static PGTRACK=1 -j8
 cd $current_dir
 
 # Handle command line arguments
@@ -38,4 +38,4 @@ echo "build Pass8..."
 echo
 setenv   USEPASS7 1
 
-make FLAG=$FLAG
+make $FLAG -j4
