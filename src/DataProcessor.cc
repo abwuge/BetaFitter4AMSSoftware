@@ -32,12 +32,12 @@ void DataProcessor::setupTree()
     tree->Branch("Theta", &particleData.Theta, "Theta/F");
     tree->Branch("Phi", &particleData.Phi, "Phi/F");
 
-    // Hit information
-    tree->Branch("hitX", &particleData.hitX);
-    tree->Branch("hitY", &particleData.hitY);
-    tree->Branch("hitZ", &particleData.hitZ);
-    tree->Branch("hitTime", &particleData.hitTime);
-    tree->Branch("hitTimeError", &particleData.hitTimeError);
+    // Hit information - Using fixed size arrays with MAX_HITS
+    tree->Branch("hitX", particleData.hitX, Form("hitX[%d]/F", ParticleData::MAX_HITS));
+    tree->Branch("hitY", particleData.hitY, Form("hitY[%d]/F", ParticleData::MAX_HITS));
+    tree->Branch("hitZ", particleData.hitZ, Form("hitZ[%d]/F", ParticleData::MAX_HITS));
+    tree->Branch("hitTime", particleData.hitTime, Form("hitTime[%d]/F", ParticleData::MAX_HITS));
+    tree->Branch("hitTimeError", particleData.hitTimeError, Form("hitTimeError[%d]/F", ParticleData::MAX_HITS));
 
     // MC truth information
     tree->Branch("mcBeta", &particleData.mcBeta, "mcBeta/F");
@@ -59,7 +59,7 @@ bool DataProcessor::processParticle(ParticleR *particle)
     particleData.Theta = particle->Theta;
     particleData.Phi = particle->Phi;
 
-    for (int tof = 0; tof < 4; tof++)
+    for (int tof = 0; tof < ParticleData::MAX_HITS; tof++)
     {
         particleData.hitX[tof] = particle->TOFCoo[tof][0];
         particleData.hitY[tof] = particle->TOFCoo[tof][1];
@@ -70,7 +70,7 @@ bool DataProcessor::processParticle(ParticleR *particle)
     if (!beta)
         return false;
 
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < ParticleData::MAX_HITS; i++)
     {
         particleData.hitTime[i] = beta->GetTime(i);
         particleData.hitTimeError[i] = beta->GetETime(i);

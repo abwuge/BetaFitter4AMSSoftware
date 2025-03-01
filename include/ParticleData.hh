@@ -1,8 +1,6 @@
 #ifndef __PARTICLEDATA_HH__
 #define __PARTICLEDATA_HH__
 
-#include <vector>
-
 struct ParticleData
 {
     // Particle properties
@@ -15,11 +13,12 @@ struct ParticleData
     float Phi;
 
     // Particle hit information
-    std::vector<float> hitX;
-    std::vector<float> hitY;
-    std::vector<float> hitZ;
-    std::vector<float> hitTime;
-    std::vector<float> hitTimeError;
+    static const int MAX_HITS = 4;  // Maximum number of hits
+    float hitX[MAX_HITS];
+    float hitY[MAX_HITS];
+    float hitZ[MAX_HITS];
+    float hitTime[MAX_HITS];
+    float hitTimeError[MAX_HITS];
 
     // MC truth information
     float mcBeta;       // MC truth beta
@@ -28,22 +27,27 @@ struct ParticleData
     int mcPdgId;        // MC particle PDG ID
     bool isMC;          // Flag to indicate if it's MC particle
 
-    // Constructor to initialize vectors and particle properties with appropriate default values
+    // Constructor to initialize arrays and particle properties with appropriate default values
     ParticleData() : mass(0.0f),
                      charge(0.0f),
                      momentum(0.0f),
                      Theta(0.0f),
                      Phi(0.0f),
-                     hitX(4, 0.0f),
-                     hitY(4, 0.0f),
-                     hitZ(4, 0.0f),
-                     hitTime(4, 0.0f),
-                     hitTimeError(4, 0.0f),
                      mcBeta(0.0f),
                      mcMomentum(0.0f),
                      mcMass(0.0f),
                      mcPdgId(0),
-                     isMC(false) {}
+                     isMC(false) 
+    {
+        // Initialize arrays with zeros
+        for(int i = 0; i < MAX_HITS; i++) {
+            hitX[i] = 0.0f;
+            hitY[i] = 0.0f;
+            hitZ[i] = 0.0f;
+            hitTime[i] = 0.0f;  
+            hitTimeError[i] = 0.0f;
+        }
+    }
 };
 
 #endif // __PARTICLEDATA_HH__

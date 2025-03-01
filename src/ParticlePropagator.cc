@@ -2,22 +2,28 @@
 #include <cmath>
 #include <stdexcept>
 
+constexpr double ParticlePropagator::TOF_Z[4];
+
 ParticlePropagator::ParticlePropagator(const AMSPoint &pos,
                                        const AMSDir &dir,
                                        double momentum,
                                        double mass,
                                        int charge)
+    : TrProp(pos, dir), _initPos(pos), _initDir(dir)
 {
-    if (!charge)
+    if (charge == 0)
     {
-        printf("ParticlePropagator: Due to energy loss calculations, charge cannot be zero. Setting charge to 1.\n");
+        printf("ParticlePropagator: Due to energy loss calculations, "
+               "charge cannot be zero. Setting charge to 1.\n");
         charge = 1;
     }
 
-    TrProp::TrProp(pos, dir, momentum / charge);
-    SetMassChrg(mass, charge);
+    _chrgSign = (momentum > 0) ? 1 : -1;
+
+    _rigidity = momentum / charge;
     _momentum = momentum;
     _energy = sqrt(mass * mass + momentum * momentum);
+    SetMassChrg(mass, charge);
 }
 
 double ParticlePropagator::GetBeta() const
@@ -96,7 +102,7 @@ bool ParticlePropagator::PropagateToTOF(double hitX[4], double hitY[4],
         // Calculate path length and time
         total_length += len;
         pathLength[i] = total_length;
-        hitTime[i] = total_length / (GetBeta() * SPEED_OF_LIGHT);
+        hitTime[i] = (i ? hitTime[i - 1] : 0) + len / (GetBeta() * SPEED_OF_LIGHT);
 
         // Update kinematics for next layer (except for last layer)
         if (i < 3)
@@ -106,22 +112,24 @@ bool ParticlePropagator::PropagateToTOF(double hitX[4], double hitY[4],
     return true;
 }
 
-bool ParticlePropagator::resetPropagator(const AMSPoint &pos,
-                                         const AMSDir &dir,
-                                         double momentum)
+bool ParticlePropagator::resetPropagator(double beta)
 {
-    if (momentum <= 0)
+    if (beta <= 0 || beta >= 1)
+    {
+        printf("ParticlePropagator: Invalid beta value. Must be between 0 and 1.\n");
         return false;
+    }
 
-    _p0x = pos.x();
-    _p0y = pos.y();
-    _p0z = pos.z();
-    _dxdz = (dir.z() != 0) ? dir.x() / dir.z() : 0;
-    _dydz = (dir.z() != 0) ? dir.y() / dir.z() : 0;
+    _momentum = _mass * beta / sqrt(1 - beta * beta);
+    _momentum *= _chrgSign;
+    _energy = sqrt(_mass * _mass + _momentum * _momentum);
+    _rigidity = _momentum / _charge;
 
-    _momentum = momentum;
-    _energy = sqrt(_mass * _mass + momentum * momentum);
-    _rigidity = momentum / _chrg;
+    _p0x = _initPos.x();
+    _p0y = _initPos.y();
+    _p0z = _initPos.z();
+    _dxdz = (_initDir.z() != 0) ? _initDir.x() / _initDir.z() : 0;
+    _dydz = (_initDir.z() != 0) ? _initDir.y() / _initDir.z() : 0;
 
     return true;
 }

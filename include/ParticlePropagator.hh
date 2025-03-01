@@ -14,11 +14,18 @@ public:
     static constexpr double TOF_Z[4] = {65.2, 62.1, -62.1, -65.2};
 
 private:
+    AMSPoint _initPos;      // Initial position of the particle
+    AMSDir _initDir;        // Initial direction of the particle
+    int _chrgSign;          // Sign of the particle charge
+    
     AMSPoint _hitPoints[4]; // Hit positions on TOF layers
     AMSDir _hitDirs[4];     // Track directions at hit points
 
     double _momentum; // Momentum of the particle
     double _energy;   // Energy of the particle
+    double _mass;     // Mass of the particle
+    double _charge;   // Charge of the particle
+    double _beta;     // Beta (v/c) of the particle
 
 public:
     /**
@@ -38,14 +45,10 @@ public:
 
     /**
      * Reset propagator state with new parameters
-     * @param pos New position of the particle
-     * @param dir New direction of the particle
-     * @param momentum New momentum of the particle (GeV/c)
-     * @return true if reset successful, false if momentum <= 0
+     * @param beta New beta of the particle
+     * @return true if reset successful, false if beta is invalid
      */
-    bool resetPropagator(const AMSPoint &pos,
-                         const AMSDir &dir,
-                         double momentum);
+    bool resetPropagator(double beta);
 
     /**
      * Propagate particle to specified z position with energy loss

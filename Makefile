@@ -18,13 +18,15 @@ ifneq ($(findstring g,$(CXX)),g)
  endif
 endif
 
-# Handle build flags
-debug: OPTFLAGS:=-O0 -g
-debug: CERNLIB:=-L/cvmfs/ams.cern.ch/Offline/CERN/2005/lib -lpacklib -lmathlib -lkernlib
-debug: all
-
+# Set default optimization flags
 OPTFLAGS?=-O3
 CERNLIB?=
+
+# Handle debug target
+.PHONY: debug
+debug: OPTFLAGS=-O0 -g
+debug: CERNLIB=-L/cvmfs/ams.cern.ch/Offline/CERN/2005/lib -lpacklib -lmathlib -lkernlib
+debug: all
 
 #----
 VERSION6     := $(shell $(ROOTSYS)/bin/root-config --version | cut -b1-1)
@@ -45,11 +47,11 @@ endif
 OBJS=$(SRC:%.cc=%.o)
 
 ############
-CXXFLAGS:=$(OPTFLAGS) -qopenmp -std=c++11 -Wabi-tag
+CXXFLAGS=$(OPTFLAGS) -qopenmp -std=c++11 -Wabi-tag
 ifeq ($(findstring icpx,$(CXX)),icpx)
-  CXXFLAGS:=$(OPTFLAGS) -qopenmp -std=c++11 -axSSE4.2,SSE4.1,SSSE3,AVX,CORE-AVX2,CORE-AVX512 -fp-model precise -Wabi
+  CXXFLAGS=$(OPTFLAGS) -qopenmp -std=c++11 -axSSE4.2,SSE4.1,SSSE3,AVX,CORE-AVX2,CORE-AVX512 -fp-model precise -Wabi
 else ifeq ($(findstring g,$(CXX)),g)
-  CXXFLAGS:=$(OPTFLAGS) -std=c++11 -Wall -Wabi-tag -Wno-unused-variable -Wno-unused-but-set-variable
+  CXXFLAGS=$(OPTFLAGS) -std=c++11 -Wall -Wabi-tag -Wno-unused-variable -Wno-unused-but-set-variable
 endif 
 CXXFLAGS+= -D_GLIBCXX_USE_CXX11_ABI=0
 
