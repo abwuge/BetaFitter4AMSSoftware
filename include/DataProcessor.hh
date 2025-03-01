@@ -8,6 +8,8 @@
 
 #include "amschain.h"
 #include "ParticleData.hh"
+#include "BetaFitter.hh"
+#include "ParticlePropagator.hh"
 
 class DataProcessor {
 public:
@@ -19,10 +21,16 @@ public:
 private:
     void setupTree();
     bool processParticle(ParticleR* particle);
-
+    bool selectMainParticle(AMSEventR* event, int& selectedIndex);
+    
+    // Member variables
     std::unique_ptr<TFile> outputFile;
     TTree* tree;
     ParticleData particleData;
+    
+    // Variables for particle selection
+    int ibetah{-1};     // Selected BetaH index
+    int itrtrack{-1};   // Selected track index
 };
 
 #endif // __DATAPROCESSOR_HH__
