@@ -7,6 +7,8 @@
 #include "TFile.h"
 #include "TCanvas.h"
 #include "TStyle.h"
+#include "TGraph.h"
+#include "TLegend.h"
 
 #include "Util.hh"
 #include "DataProcessor.hh"
@@ -25,17 +27,17 @@ int main(int argc, char **argv)
     std::string outputFile = argv[2];
     int maxEventsNumber = argc > 3 ? std::stoi(argv[3]) : -1;
 
-    // AMSChain chain;
-    // if (!Util::addInputFile(inputFile, chain))
-    // {
-    //     std::cerr << "Error: could not add input file" << std::endl;
-    //     return 1;
-    // }
+    AMSChain chain;
+    if (!Util::addInputFile(inputFile, chain))
+    {
+        std::cerr << "Error: could not add input file" << std::endl;
+        return 1;
+    }
 
-    // DataProcessor* processor = new DataProcessor(outputFile);
-    // processor->processEvents(chain, maxEventsNumber);
+    DataProcessor* processor = new DataProcessor(outputFile);
+    processor->processEvents(chain, maxEventsNumber);
 
-    // delete processor;
+    delete processor;
 
     // Load particle data from input file
     std::vector<ParticleData> particles = Util::loadParticleData(outputFile);
@@ -44,8 +46,10 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // Create output file and histogram
-    TH1F *hBetaDiff = new TH1F("hBetaDiff", "1/#beta_{rec} - 1/#beta_{MC};1/#beta_{rec} - 1/#beta_{MC};Events", 100, -0.5, 0.5);
+    // Create vectors for graph points
+    std::vector<double> mcBeta;
+    std::vector<double> linearBeta;
+    std::vector<double> nonlinearBeta;
 
     // Process each particle
     for (const auto& particle : particles) {
@@ -85,20 +89,70 @@ int main(int argc, char **argv)
                                                   pow(particle.hitZ[i] - particle.hitZ[0], 2));
         }
         
-        // Reconstruct beta
-        double beta_rec = BetaFitter::reconstructBeta(&tempParticle, propagator, measuredTimes, timeErrors);
-        if (beta_rec <= 0) continue;
-
-        // Fill histogram with difference
-        double inv_beta_diff = beta_rec - 1.0/particle.mcBeta; // beta_rec已经是1/beta了
-        hBetaDiff->Fill(inv_beta_diff);
+        // Reconstruct beta with nonlinear algorithm
+        double nonlinear_beta_rec = BetaFitter::reconstructBeta(&tempParticle, propagator, measuredTimes, timeErrors);
+        if (nonlinear_beta_rec <= 0) continue;
+        
+        // Get linear beta from particle data
+        double linear_beta_rec = particle.beta;
+        if (linear_beta_rec <= 0) continue;
+        
+        // Store values for plotting
+        mcBeta.push_back(particle.mcBeta);
+        linearBeta.push_back(linear_beta_rec);
+        nonlinearBeta.push_back(1.0/nonlinear_beta_rec); // Convert from 1/beta to beta
     }
 
-    // Draw and save histogram
-    TCanvas *c1 = new TCanvas("c1", "Beta Difference", 800, 600);
-    gStyle->SetOptStat(111111);
-    hBetaDiff->Draw();
-    c1->SaveAs((outputFile + "_betaDiff.pdf").c_str());
+    // Draw and save plot
+    TCanvas *c1 = new TCanvas("c1", "Beta Reconstruction Comparison", 800, 600);
+    
+    // Create graphs
+    TGraph *grLinear = new TGraph(mcBeta.size(), &mcBeta[0], &linearBeta[0]);
+    TGraph *grNonlinear = new TGraph(mcBeta.size(), &mcBeta[0], &nonlinearBeta[0]);
+    
+    // Set graph styles
+    grLinear->SetMarkerStyle(20);
+    grLinear->SetMarkerColor(kBlue);
+    grLinear->SetLineColor(kBlue);
+    grLinear->SetMarkerSize(0.5);
+    
+    grNonlinear->SetMarkerStyle(21);
+    grNonlinear->SetMarkerColor(kRed);
+    grNonlinear->SetLineColor(kRed);
+    grNonlinear->SetMarkerSize(0.5);
+    
+    // Set up drawing
+    grLinear->SetTitle("Beta Reconstruction Comparison");
+    grLinear->GetXaxis()->SetTitle("MC Beta");
+    grLinear->GetYaxis()->SetTitle("Reconstructed Beta");
+    
+    // Draw graphs
+    grLinear->Draw("AP");
+    grNonlinear->Draw("P SAME");
+    
+    // Add legend
+    TLegend *legend = new TLegend(0.15, 0.7, 0.45, 0.85);
+    legend->AddEntry(grLinear, "Linear Reconstruction", "p");
+    legend->AddEntry(grNonlinear, "Nonlinear Reconstruction", "p");
+    legend->Draw();
+    
+    // Draw diagonal reference line (perfect reconstruction)
+    TGraph *grReference = new TGraph(2);
+    grReference->SetPoint(0, 0, 0);
+    grReference->SetPoint(1, 1, 1);
+    grReference->SetLineStyle(2);
+    grReference->SetLineColor(kGreen);
+    grReference->Draw("L SAME");
+    
+    // Save plot
+    c1->SaveAs((outputFile + "_betaComparison.pdf").c_str());
+    
+    // Clean up
+    delete grLinear;
+    delete grNonlinear;
+    delete grReference;
+    delete legend;
+    delete c1;
 
     return 0;
 }

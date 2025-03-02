@@ -7,7 +7,7 @@ struct ParticleData
     float mass;     // Mass
     float charge;   // Charge (Always positive)
     float momentum; // Momentum (positive if charge > 0, negative if charge < 0)
-    float Beta;     // Reconstructed beta value
+    float beta;     // Reconstructed beta value
 
     // Particle direction
     float Theta;
@@ -32,7 +32,7 @@ struct ParticleData
     ParticleData() : mass(0.0f),
                      charge(0.0f),
                      momentum(0.0f),
-                     Beta(0.0f),
+                     beta(0.0f),
                      Theta(0.0f),
                      Phi(0.0f),
                      mcBeta(0.0f),
