@@ -46,7 +46,7 @@ private:
      * @param pathLengths Array of path lengths to TOF hits
      * @return Initial 1/beta estimate
      */
-    static double getInitialBeta(const double measuredTimes[4],
+    static double getInitialInvBeta(const double measuredTimes[4],
                                 const double pathLengths[4]);
 };
 

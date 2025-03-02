@@ -123,7 +123,7 @@ bool ParticlePropagator::resetPropagator(double beta)
     _momentum = _mass * beta / sqrt(1 - beta * beta);
     _momentum *= _chrgSign;
     _energy = sqrt(_mass * _mass + _momentum * _momentum);
-    _rigidity = _momentum / _charge;
+    _rigidity = _momentum / _chrg;
 
     _p0x = _initPos.x();
     _p0y = _initPos.y();

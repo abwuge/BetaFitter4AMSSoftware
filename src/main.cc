@@ -27,17 +27,17 @@ int main(int argc, char **argv)
     std::string outputFile = argv[2];
     int maxEventsNumber = argc > 3 ? std::stoi(argv[3]) : -1;
 
-    AMSChain chain;
-    if (!Util::addInputFile(inputFile, chain))
-    {
-        std::cerr << "Error: could not add input file" << std::endl;
-        return 1;
-    }
+    // AMSChain chain;
+    // if (!Util::addInputFile(inputFile, chain))
+    // {
+    //     std::cerr << "Error: could not add input file" << std::endl;
+    //     return 1;
+    // }
 
-    DataProcessor* processor = new DataProcessor(outputFile);
-    processor->processEvents(chain, maxEventsNumber);
+    // DataProcessor* processor = new DataProcessor(outputFile);
+    // processor->processEvents(chain, maxEventsNumber);
 
-    delete processor;
+    // delete processor;
 
     // Load particle data from input file
     std::vector<ParticleData> particles = Util::loadParticleData(outputFile);

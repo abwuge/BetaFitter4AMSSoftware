@@ -23,8 +23,6 @@ private:
 
     double _momentum; // Momentum of the particle
     double _energy;   // Energy of the particle
-    double _mass;     // Mass of the particle
-    double _charge;   // Charge of the particle
     double _beta;     // Beta (v/c) of the particle
 
 public:
