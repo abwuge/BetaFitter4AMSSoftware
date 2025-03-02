@@ -29,6 +29,7 @@ void DataProcessor::setupTree()
     tree->Branch("mass", &particleData.mass, "mass/F");
     tree->Branch("charge", &particleData.charge, "charge/F");
     tree->Branch("momentum", &particleData.momentum, "momentum/F");
+    tree->Branch("Beta", &particleData.Beta, "Beta/F");
     tree->Branch("Theta", &particleData.Theta, "Theta/F");
     tree->Branch("Phi", &particleData.Phi, "Phi/F");
 
@@ -56,6 +57,7 @@ bool DataProcessor::processParticle(ParticleR *particle)
     particleData.mass = particle->Mass;
     particleData.charge = particle->Charge;
     particleData.momentum = particle->Momentum;
+    particleData.Beta = particle->Beta;
     particleData.Theta = particle->Theta;
     particleData.Phi = particle->Phi;
 
