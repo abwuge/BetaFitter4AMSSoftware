@@ -63,15 +63,16 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     tree->SetBranchAddress("mass", &data.mass);
     tree->SetBranchAddress("charge", &data.charge);
     tree->SetBranchAddress("momentum", &data.momentum);
+    tree->SetBranchAddress("beta", &data.beta);
     tree->SetBranchAddress("Theta", &data.Theta);
     tree->SetBranchAddress("Phi", &data.Phi);
     
     // Set branch addresses for hit information
-    tree->SetBranchAddress("hitX", &data.hitX);
-    tree->SetBranchAddress("hitY", &data.hitY);
-    tree->SetBranchAddress("hitZ", &data.hitZ);
-    tree->SetBranchAddress("hitTime", &data.hitTime);
-    tree->SetBranchAddress("hitTimeError", &data.hitTimeError);
+    tree->SetBranchAddress("hitX", data.hitX);
+    tree->SetBranchAddress("hitY", data.hitY);
+    tree->SetBranchAddress("hitZ", data.hitZ);
+    tree->SetBranchAddress("hitTime", data.hitTime);
+    tree->SetBranchAddress("hitTimeError", data.hitTimeError);
     
     // Set branch addresses for MC truth information
     tree->SetBranchAddress("mcBeta", &data.mcBeta);
