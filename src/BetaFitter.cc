@@ -2,29 +2,6 @@
 #include <algorithm>
 #include <TMath.h>
 
-double BetaFitter::getInitialInvBeta(const double measuredTimes[4],
-                                  const double pathLengths[4])
-{
-
-    double sumL = 0.0;  // sum(L)
-    double sumT = 0.0;  // sum(t)
-    double sumLT = 0.0; // sum(L*t)
-    double sumL2 = 0.0; // sum(L^2)
-
-    for (int i = 0; i < 4; ++i)
-    {
-        sumL += pathLengths[i];
-        sumT += measuredTimes[i];
-        sumLT += pathLengths[i] * measuredTimes[i];
-        sumL2 += pathLengths[i] * pathLengths[i];
-    }
-
-  const double denominator = 4 * sumL2 - sumL * sumL;
-  const double k = (4 * sumLT - sumL * sumT) / denominator;
-
-  return k * ParticlePropagator::SPEED_OF_LIGHT;
-}
-
 double BetaFitter::calculateChi2(const double *invBeta,
                                  ParticlePropagator &propagator,
                                  const double measuredTimes[4],
@@ -38,44 +15,43 @@ double BetaFitter::calculateChi2(const double *invBeta,
     // Calculate TOF hits and path lengths
     double hitX[4], hitY[4], hitTime[4], pathLength[4];
     if (!propagator.PropagateToTOF(hitX, hitY, hitTime, pathLength))
-    {
         return 1e10 * invBeta[0];
-    }
+
+    double minTime = *std::min_element(hitTime, hitTime + 4);
+    for (int i = 0; i < 4; ++i)
+        hitTime[i] -= minTime;
 
     // Calculate chi-square
     double chi2 = 0;
-    int nHits = 0;
     for (int i = 0; i < 4; ++i)
     {
         double dt = hitTime[i] - measuredTimes[i];
         double sigma = timeErrors[i];
         chi2 += (dt * dt) / (sigma * sigma);
-        nHits++;
     }
 
-    return nHits > 0 ? chi2 : 1e10 * invBeta[0];
+    return std::isinf(chi2) ? 1e10 * invBeta[0] : chi2;
 }
 
-double BetaFitter::reconstructBeta(const ParticleR *particle,
+double BetaFitter::reconstructBeta(const ParticleData *particle,
                                    ParticlePropagator &propagator,
-                                   const double measuredTimes[4],
+                                   const double measuredTimesOri[4],
                                    const double timeErrors[4])
 {
-    // Get initial beta estimate from linear fit
-    double pathLengths[4];
+    double measuredTimes[4];
+    double minTime = *std::min_element(measuredTimesOri, measuredTimesOri + 4);
     for (int i = 0; i < 4; ++i)
-    {
-        pathLengths[i] = particle->TOFTLength[i];
-    }
-    double initialBetaRecip = getInitialInvBeta(measuredTimes, pathLengths);
+        measuredTimes[i] = measuredTimesOri[i] - minTime;
+
+    double initialBetaRecip = 1 / particle->beta;
 
     // Set up minimizer
     ROOT::Math::Minimizer *minimizer =
         ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad");
 
-    minimizer->SetMaxFunctionCalls(1000);
-    minimizer->SetMaxIterations(100);
-    minimizer->SetTolerance(1e-3);
+    // minimizer->SetMaxFunctionCalls(1000);
+    // minimizer->SetMaxIterations(100);
+    // minimizer->SetTolerance(1e-3);
 
     // Create chi-square function
     auto chi2Function = [&](const double *params)

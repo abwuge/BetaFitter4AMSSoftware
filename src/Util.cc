@@ -38,16 +38,18 @@ bool Util::addInputFile(std::string &inputFile, AMSChain &chain)
 std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
 {
     std::vector<ParticleData> particles;
-    
+
     // Open ROOT file
     TFile *file = TFile::Open(inputFile.c_str(), "READ");
-    if (!file || file->IsZombie()) {
+    if (!file || file->IsZombie())
+    {
         return particles;
     }
-    
+
     // Get tree
-    TTree *tree = (TTree*)file->Get("particle");
-    if (!tree) {
+    TTree *tree = (TTree *)file->Get("particle");
+    if (!tree)
+    {
         file->Close();
         return particles;
     }
@@ -58,7 +60,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
 
     // Create a particle data object and set branch addresses
     ParticleData data;
-    
+
     // Set branch addresses for particle properties
     tree->SetBranchAddress("mass", &data.mass);
     tree->SetBranchAddress("charge", &data.charge);
@@ -66,27 +68,29 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     tree->SetBranchAddress("beta", &data.beta);
     tree->SetBranchAddress("Theta", &data.Theta);
     tree->SetBranchAddress("Phi", &data.Phi);
-    
+
     // Set branch addresses for hit information
     tree->SetBranchAddress("hitX", data.hitX);
     tree->SetBranchAddress("hitY", data.hitY);
     tree->SetBranchAddress("hitZ", data.hitZ);
     tree->SetBranchAddress("hitTime", data.hitTime);
     tree->SetBranchAddress("hitTimeError", data.hitTimeError);
-    
+
     // Set branch addresses for MC truth information
     tree->SetBranchAddress("mcBeta", &data.mcBeta);
     tree->SetBranchAddress("mcMomentum", &data.mcMomentum);
     tree->SetBranchAddress("mcMass", &data.mcMass);
+    tree->SetBranchAddress("mcCharge", &data.mcCharge);
     tree->SetBranchAddress("mcPdgId", &data.mcPdgId);
     tree->SetBranchAddress("isMC", &data.isMC);
-    
+
     // Read all entries
-    for (Long64_t i = 0; i < nEntries; ++i) {
+    for (Long64_t i = 0; i < nEntries; ++i)
+    {
         tree->GetEntry(i);
         particles.push_back(data);
     }
-    
+
     file->Close();
     return particles;
 }

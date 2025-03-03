@@ -25,6 +25,7 @@ struct ParticleData
     float mcBeta;     // MC truth beta
     float mcMomentum; // MC truth momentum
     float mcMass;     // MC truth mass
+    int mcCharge;     // MC truth charge
     int mcPdgId;      // MC particle PDG ID
     bool isMC;        // Flag to indicate if it's MC particle
 
@@ -38,6 +39,7 @@ struct ParticleData
                      mcBeta(0.0f),
                      mcMomentum(0.0f),
                      mcMass(0.0f),
+                     mcCharge(0),
                      mcPdgId(0),
                      isMC(false)
     {

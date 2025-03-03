@@ -21,9 +21,9 @@ public:
      * @param timeErrors Array of TOF time measurement errors
      * @return Reconstructed 1/beta value
      */
-    static double reconstructBeta(const ParticleR* particle,
+    static double reconstructBeta(const ParticleData* particle,
                                 ParticlePropagator& propagator,
-                                const double measuredTimes[4],
+                                const double measuredTimesOri[4],
                                 const double timeErrors[4]);
 
 private:

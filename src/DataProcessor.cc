@@ -44,6 +44,7 @@ void DataProcessor::setupTree()
     tree->Branch("mcBeta", &particleData.mcBeta, "mcBeta/F");
     tree->Branch("mcMomentum", &particleData.mcMomentum, "mcMomentum/F");
     tree->Branch("mcMass", &particleData.mcMass, "mcMass/F");
+    tree->Branch("mcCharge", &particleData.mcCharge, "mcCharge/I");  // 改为I表示int类型
     tree->Branch("mcPdgId", &particleData.mcPdgId, "mcPdgId/I");
     tree->Branch("isMC", &particleData.isMC, "isMC/O");
 }
@@ -97,22 +98,23 @@ bool DataProcessor::processEvents(AMSChain &chain, int maxEvents)
             MCEventgR *mcEvent = event->GetPrimaryMC();
             particleData.isMC = true;
             particleData.mcPdgId = mcEvent->Particle;
+            particleData.mcCharge = mcEvent->Charge;
             particleData.mcMass = mcEvent->Mass;
             particleData.mcMomentum = mcEvent->Momentum;
             // Calculate beta from MC momentum and mass
-            float energy = sqrt(particleData.mcMomentum * particleData.mcMomentum + 
-                              particleData.mcMass * particleData.mcMass);
+            float energy = sqrt(particleData.mcMomentum * particleData.mcMomentum +
+                                particleData.mcMass * particleData.mcMass);
             particleData.mcBeta = particleData.mcMomentum / energy;
         }
         else
         {
             particleData.isMC = false;
             particleData.mcPdgId = 0;
+            particleData.mcCharge = 0.0f;
             particleData.mcMass = 0.0f;
             particleData.mcMomentum = 0.0f;
             particleData.mcBeta = 0.0f;
         }
-
 #ifdef false
         int mainParticleIdx = -1;
         if (!selectMainParticle(event, mainParticleIdx))
