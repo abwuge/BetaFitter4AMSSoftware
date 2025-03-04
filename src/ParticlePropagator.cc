@@ -46,6 +46,7 @@ void ParticlePropagator::UpdateWithEnergyLoss(const AMSPoint &start_point,
                                               double z_target)
 {
     // Calculate energy loss using Betalhd
+    z_target = z_target < start_point.z() ? z_target - 1 : z_target + 1;
     double energy_loss = Betalhd::CalculateEnergyLoss(start_point, direction, _rigidity,
                                                       start_point.z(), z_target,
                                                       _mass, _chrg, 0);
@@ -70,7 +71,8 @@ double ParticlePropagator::PropagateToZ(double z_target)
         return -1;
 
     // Update kinematics with energy loss
-    UpdateWithEnergyLoss(start_point, direction, z_target);
+    // TODO: Why energy loss can be negative?
+    // UpdateWithEnergyLoss(start_point, direction, z_target);
 
     return GetBeta();
 }
@@ -85,6 +87,7 @@ bool ParticlePropagator::PropagateToTOF(double hitX[4], double hitY[4],
         // Save current state before propagation
         AMSPoint start_point = GetP0();
         AMSDir start_dir = GetDir();
+        double current_beta = GetBeta();
 
         // Propagate to TOF layer
         double len = TrProp::Propagate(TOF_Z[i]);
@@ -99,14 +102,15 @@ bool ParticlePropagator::PropagateToTOF(double hitX[4], double hitY[4],
         hitX[i] = _hitPoints[i].x();
         hitY[i] = _hitPoints[i].y();
 
-        // Calculate path length and time
+        // Calculate path length and time using the beta value at the start of this segment
         total_length += len;
         pathLength[i] = total_length;
-        hitTime[i] = (i ? hitTime[i - 1] : 0) + len / (GetBeta() * SPEED_OF_LIGHT);
+        hitTime[i] = (i ? hitTime[i - 1] : 0) + len / (current_beta * SPEED_OF_LIGHT);
 
         // Update kinematics for next layer (except for last layer)
-        if (i < 3)
-            UpdateWithEnergyLoss(start_point, start_dir, TOF_Z[i]);
+        // TODO: Why energy loss can be negative?
+        // if (i < 3)
+        //     UpdateWithEnergyLoss(start_point, start_dir, TOF_Z[i]);
     }
 
     return true;

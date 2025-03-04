@@ -27,20 +27,20 @@ int main(int argc, char **argv)
     std::string outputFile = argv[2];
     int maxEventsNumber = argc > 3 ? std::stoi(argv[3]) : -1;
 
-    AMSChain chain;
-    if (!Util::addInputFile(inputFile, chain))
-    {
-        std::cerr << "Error: could not add input file" << std::endl;
-        return 1;
-    }
+    // AMSChain chain;
+    // if (!Util::addInputFile(inputFile, chain))
+    // {
+    //     std::cerr << "Error: could not add input file" << std::endl;
+    //     return 1;
+    // }
 
-    DataProcessor *processor = new DataProcessor(outputFile);
-    processor->processEvents(chain, maxEventsNumber);
+    // DataProcessor *processor = new DataProcessor(outputFile);
+    // processor->processEvents(chain, maxEventsNumber);
 
-    delete processor;
+    // delete processor;
 
     // Load particle data from input file
-    std::vector<ParticleData> particles = Util::loadParticleData(outputFile);
+    std::vector<ParticleData> particles = Util::loadParticleData2("/home/ams/hxwu/AMSSoft/amsd69n/amsd69n/test_list_-1.root");
     if (particles.empty())
     {
         std::cerr << "Error: No particles loaded from input file" << std::endl;
@@ -54,23 +54,34 @@ int main(int argc, char **argv)
 
     TH1F *hBetaDiff = new TH1F("hBetaDiff", "1/#beta_{rec} - 1/#beta_{MC};1/#beta_{rec} - 1/#beta_{MC};Events", 100, -0.5, 0.5);
 
+    // Draw and save plot
+    TCanvas *c1 = new TCanvas("c1", "Beta Reconstruction Comparison", 800, 600);
+    c1->cd();
+    c1->Print((outputFile + "_trajectory.pdf[").c_str(), "pdf");
+
     // Process each particle
+
     for (const auto &particle : particles)
     {
         // Skip invalid particles
         if (!particle.isMC)
             continue;
-        if (particle.mass < 0)
+        // if (particle.mass < 0)
+            // continue;
+        if (particle.mcCoo[0] == -1000)
             continue;
 
         // Create initial state for propagation
-        AMSPoint pos(particle.hitX[0], particle.hitY[0], particle.hitZ[0]);
-        AMSDir dir;
-        dir.SetTheta(particle.Theta);
-        dir.SetPhi(particle.Phi);
+        // TODO: Use MC truth position and direction
+        AMSPoint pos(particle.mcCoo[0], particle.mcCoo[1], particle.mcCoo[2]);
+        AMSDir dir(particle.mcDir[0], particle.mcDir[1], particle.mcDir[2]);
+        // AMSPoint pos(particle.hitX[0], particle.hitY[0], particle.hitZ[0]);
+        // AMSDir dir;
+        // dir.SetTheta(particle.Theta);
+        // dir.SetPhi(particle.Phi);
 
         // Setup particle propagator with initial state
-        ParticlePropagator propagator(pos, dir, particle.momentum, particle.mcMass, particle.mcCharge);
+        ParticlePropagator propagator(pos, dir, particle.mcMomentum, particle.mcMass, particle.mcCharge);
 
         // Prepare arrays for beta reconstruction
         double measuredTimes[4], timeErrors[4];
@@ -96,11 +107,12 @@ int main(int argc, char **argv)
         nonlinearBeta.push_back(nonlinear_beta_rec); // Store nonlinear beta direct
 
         hBetaDiff->Fill(1.0 / nonlinear_beta_rec - 1.0 / particle.mcBeta);
+
+        // Util::drawTrajectory(particle, outputFile + "_trajectory.pdf");
+
     }
 
-    // Draw and save plot
-    TCanvas *c1 = new TCanvas("c1", "Beta Reconstruction Comparison", 800, 600);
-    c1->cd();
+    c1->Print((outputFile + "_trajectory.pdf]").c_str(), "pdf");
 
     // Create graphs
     TGraph *grLinear = new TGraph(mcBeta.size(), &mcBeta[0], &linearBeta[0]);
@@ -120,7 +132,9 @@ int main(int argc, char **argv)
     // Set up drawing
     grLinear->SetTitle("Beta Reconstruction Comparison");
     grLinear->GetXaxis()->SetTitle("MC Beta");
+    grLinear->GetXaxis()->SetRangeUser(0, 1);
     grLinear->GetYaxis()->SetTitle("Reconstructed Beta");
+    grLinear->GetYaxis()->SetRangeUser(0, 1);
 
     // Draw graphs
     grLinear->Draw("AP");

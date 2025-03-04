@@ -25,6 +25,8 @@ struct ParticleData
     float mcBeta;     // MC truth beta
     float mcMomentum; // MC truth momentum
     float mcMass;     // MC truth mass
+    float mcCoo[3];   // MC truth initial position (cm)
+    float mcDir[3];   // MC truth initial direction cosines
     int mcCharge;     // MC truth charge
     int mcPdgId;      // MC particle PDG ID
     bool isMC;        // Flag to indicate if it's MC particle
@@ -51,6 +53,13 @@ struct ParticleData
             hitZ[i] = 0.0f;
             hitTime[i] = 0.0f;
             hitTimeError[i] = 0.0f;
+        }
+        
+        // Initialize MC position and direction arrays
+        for (int i = 0; i < 3; i++)
+        {
+            mcCoo[i] = 0.0f;
+            mcDir[i] = 0.0f;
         }
     }
 };

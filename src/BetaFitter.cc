@@ -25,6 +25,8 @@ double BetaFitter::calculateChi2(const double *invBeta,
     double chi2 = 0;
     for (int i = 0; i < 4; ++i)
     {
+        if (measuredTimes[i] == -1)
+            continue;
         double dt = hitTime[i] - measuredTimes[i];
         double sigma = timeErrors[i];
         chi2 += (dt * dt) / (sigma * sigma);
@@ -38,10 +40,15 @@ double BetaFitter::reconstructBeta(const ParticleData *particle,
                                    const double measuredTimesOri[4],
                                    const double timeErrors[4])
 {
-    double measuredTimes[4];
-    double minTime = *std::min_element(measuredTimesOri, measuredTimesOri + 4);
+    double measuredTimes[4] = {-1, -1, -1, -1};
+    double minTime = 1e10;
     for (int i = 0; i < 4; ++i)
-        measuredTimes[i] = measuredTimesOri[i] - minTime;
+        if (measuredTimesOri[i] != -1)
+            minTime = std::min(minTime, measuredTimesOri[i]);
+
+    for (int i = 0; i < 4; ++i)
+        if (measuredTimesOri[i] != -1)
+            measuredTimes[i] = measuredTimesOri[i] - minTime;
 
     double initialBetaRecip = 1 / particle->beta;
 

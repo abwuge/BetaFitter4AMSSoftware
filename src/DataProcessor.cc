@@ -44,7 +44,9 @@ void DataProcessor::setupTree()
     tree->Branch("mcBeta", &particleData.mcBeta, "mcBeta/F");
     tree->Branch("mcMomentum", &particleData.mcMomentum, "mcMomentum/F");
     tree->Branch("mcMass", &particleData.mcMass, "mcMass/F");
-    tree->Branch("mcCharge", &particleData.mcCharge, "mcCharge/I");  // 改为I表示int类型
+    tree->Branch("mcCoo", particleData.mcCoo, "mcCoo[3]/F");
+    tree->Branch("mcDir", particleData.mcDir, "mcDir[3]/F");
+    tree->Branch("mcCharge", &particleData.mcCharge, "mcCharge/I");
     tree->Branch("mcPdgId", &particleData.mcPdgId, "mcPdgId/I");
     tree->Branch("isMC", &particleData.isMC, "isMC/O");
 }
@@ -101,6 +103,13 @@ bool DataProcessor::processEvents(AMSChain &chain, int maxEvents)
             particleData.mcCharge = mcEvent->Charge;
             particleData.mcMass = mcEvent->Mass;
             particleData.mcMomentum = mcEvent->Momentum;
+            
+            // Save MC position and direction
+            for (int i = 0; i < 3; i++) {
+                particleData.mcCoo[i] = mcEvent->Coo[i];
+                particleData.mcDir[i] = mcEvent->Dir[i];
+            }
+            
             // Calculate beta from MC momentum and mass
             float energy = sqrt(particleData.mcMomentum * particleData.mcMomentum +
                                 particleData.mcMass * particleData.mcMass);
@@ -110,19 +119,17 @@ bool DataProcessor::processEvents(AMSChain &chain, int maxEvents)
         {
             particleData.isMC = false;
             particleData.mcPdgId = 0;
-            particleData.mcCharge = 0.0f;
+            particleData.mcCharge = 0;
             particleData.mcMass = 0.0f;
             particleData.mcMomentum = 0.0f;
             particleData.mcBeta = 0.0f;
+            // Clear MC position and direction
+            for (int i = 0; i < 3; i++) {
+                particleData.mcCoo[i] = 0.0f;
+                particleData.mcDir[i] = 0.0f;
+            }
         }
-#ifdef false
-        int mainParticleIdx = -1;
-        if (!selectMainParticle(event, mainParticleIdx))
-            continue;
 
-        if (!processParticle(event->pParticle(mainParticleIdx)))
-            continue;
-#endif
         if (!processParticle(event->GetPrimaryParticle()))
             continue;
 
