@@ -46,7 +46,6 @@ void ParticlePropagator::UpdateWithEnergyLoss(const AMSPoint &start_point,
                                               double z_target)
 {
     // Calculate energy loss using Betalhd
-    z_target = z_target < start_point.z() ? z_target - 1 : z_target + 1;
     double energy_loss = Betalhd::CalculateEnergyLoss(start_point, direction, _rigidity,
                                                       start_point.z(), z_target,
                                                       _mass, _chrg, 0);
@@ -72,7 +71,7 @@ double ParticlePropagator::PropagateToZ(double z_target)
 
     // Update kinematics with energy loss
     // TODO: Why energy loss can be negative?
-    // UpdateWithEnergyLoss(start_point, direction, z_target);
+    UpdateWithEnergyLoss(start_point, direction, z_target);
 
     return GetBeta();
 }
@@ -109,8 +108,8 @@ bool ParticlePropagator::PropagateToTOF(double hitX[4], double hitY[4],
 
         // Update kinematics for next layer (except for last layer)
         // TODO: Why energy loss can be negative?
-        // if (i < 3)
-        //     UpdateWithEnergyLoss(start_point, start_dir, TOF_Z[i]);
+        if (i < 3)
+            UpdateWithEnergyLoss(start_point, start_dir, TOF_Z[i]);
     }
 
     return true;
