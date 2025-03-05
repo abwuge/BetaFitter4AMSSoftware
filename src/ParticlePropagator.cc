@@ -46,9 +46,10 @@ void ParticlePropagator::UpdateWithEnergyLoss(const AMSPoint &start_point,
                                               double z_target)
 {
     // Calculate energy loss using Betalhd
-    double energy_loss = Betalhd::CalculateEnergyLoss(start_point, direction, _rigidity,
-                                                      start_point.z(), z_target,
-                                                      _mass, _chrg, 0);
+    double energy_loss = _rigidity ? Betalhd::CalculateEnergyLoss(start_point, direction, _rigidity,
+                                                                  start_point.z(), z_target,
+                                                                  _mass, _chrg, 0)
+                                   : 0;
 
     // Update energy ensuring it stays above rest mass
     _energy = std::max(_mass, _energy - energy_loss);
@@ -70,7 +71,6 @@ double ParticlePropagator::PropagateToZ(double z_target)
         return -1;
 
     // Update kinematics with energy loss
-    // TODO: Why energy loss can be negative?
     UpdateWithEnergyLoss(start_point, direction, z_target);
 
     return GetBeta();
@@ -80,20 +80,41 @@ bool ParticlePropagator::PropagateToTOF(double hitX[4], double hitY[4],
                                         double hitTime[4], double pathLength[4])
 {
     double total_length = 0;
+    const int steps_per_layer = 10; // Number of sub-steps between TOF layers
 
     for (int i = 0; i < 4; ++i)
     {
-        // Save current state before propagation
-        AMSPoint start_point = GetP0();
-        AMSDir start_dir = GetDir();
-        double current_beta = GetBeta();
+        double z_start = _p0z;
+        double z_target = TOF_Z[i];
+        double dz = (z_target - z_start) / steps_per_layer;
+        double layer_length = 0;
+        double layer_time = 0;
+        double current_z_target = z_start;
 
-        // Propagate to TOF layer
-        double len = TrProp::Propagate(TOF_Z[i]);
-        if (len < 0)
-            return false;
+        // Propagate in small steps
+        for (int step = 0; step < steps_per_layer; ++step)
+        {
+            double current_beta = GetBeta();
+            if (current_beta <= 0)
+                return false;
 
-        // Store hit position and direction
+            AMSPoint start_point = GetP0();
+            AMSDir start_dir = GetDir();
+
+            current_z_target += dz;
+
+            double len = TrProp::Propagate(current_z_target);
+            if (len < 0)
+                return false;
+
+            layer_length += len;
+            layer_time += len / (current_beta * SPEED_OF_LIGHT);
+
+            // Update energy loss after each step
+            UpdateWithEnergyLoss(start_point, start_dir, current_z_target);
+        }
+
+        // Store hit position and direction for this layer
         _hitPoints[i] = GetP0();
         _hitDirs[i] = GetDir();
 
@@ -101,15 +122,10 @@ bool ParticlePropagator::PropagateToTOF(double hitX[4], double hitY[4],
         hitX[i] = _hitPoints[i].x();
         hitY[i] = _hitPoints[i].y();
 
-        // Calculate path length and time using the beta value at the start of this segment
-        total_length += len;
+        // Calculate path length and time
+        total_length += layer_length;
         pathLength[i] = total_length;
-        hitTime[i] = (i ? hitTime[i - 1] : 0) + len / (current_beta * SPEED_OF_LIGHT);
-
-        // Update kinematics for next layer (except for last layer)
-        // TODO: Why energy loss can be negative?
-        if (i < 3)
-            UpdateWithEnergyLoss(start_point, start_dir, TOF_Z[i]);
+        hitTime[i] = (i ? hitTime[i - 1] : 0) + layer_time;
     }
 
     return true;

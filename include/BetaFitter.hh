@@ -39,15 +39,6 @@ private:
                               ParticlePropagator& propagator,
                               const double measuredTimes[4],  
                               const double timeErrors[4]);
-                              
-    /**
-     * Get initial 1/beta estimate using linear method 
-     * @param measuredTimes Array of measured TOF times
-     * @param pathLengths Array of path lengths to TOF hits
-     * @return Initial 1/beta estimate
-     */
-    static double getInitialInvBeta(const double measuredTimes[4],
-                                const double pathLengths[4]);
 };
 
 #endif
