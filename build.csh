@@ -6,8 +6,8 @@ setenv AMSSRC $AMSWD
 setenv FLAG ""
 if ( "$1" == "debug" ) then
     setenv FLAG $1
-else if ( "$1" == "clean" )  then
-    setenv FLAG $1
+else if ( "$1" == "clean" ) then
+    make clean && exit
 endif
 
 setenv USEPRHEION 1
@@ -29,13 +29,17 @@ echo "build AMSVX..."
 echo
 set current_dir=`pwd`
 cd $AMSWD/install/
-make debug_static PGTRACK=1 -j8
+if ( "$FLAG" == "debug" ) then
+    make debug_static PGTRACK=1 -j8
+else
+    make static PGTRACK=1 -j8
+endif
 cd $current_dir
 
 # Handle command line arguments
 echo
 echo "build Pass8..."
 echo
-setenv   USEPASS7 1
+setenv USEPASS7 1
 
 make $FLAG -j4

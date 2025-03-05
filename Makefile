@@ -22,12 +22,6 @@ endif
 OPTFLAGS?=-O3
 CERNLIB?=
 
-# Handle debug target
-.PHONY: debug
-debug: OPTFLAGS=-O0 -g
-debug: CERNLIB=-L/cvmfs/ams.cern.ch/Offline/CERN/2005/lib -lpacklib -lmathlib -lkernlib
-debug: all
-
 #----
 VERSION6     := $(shell $(ROOTSYS)/bin/root-config --version | cut -b1-1)
 #----
@@ -151,10 +145,11 @@ endif
 # Define directories and targets
 EXE=$(BINDIR)/betaFitter_ROOT$(VERSION6)SLC6$(APP0)$(APP1)$(APP5)$(APP2)$(APP3)$(APP4)$(APP6)$(APP7)$(APP8)
 
-# Define static library path
-NTUPLE_LIB=$(AMSWD)/lib/$(MARCH)$(VERSIONP)/libntuple_slc6_PG.a
+# Define static library path and lib directory
+NTUPLE_LIBDIR=$(AMSWD)/lib/$(MARCH)$(VERSIONP)
+NTUPLE_LIB=$(NTUPLE_LIBDIR)/libntuple_slc6_PG.a
 
-.PHONY: all clean init
+.PHONY: all clean init debug
 
 # Default target should be 'all' instead of 'main'
 all: init $(EXE)
@@ -169,8 +164,14 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cc
 	$(CXX) $(CXXFLAGS) $(DEFINES) $(INCLUDEDIRS) -c $< -o $@
 
 $(EXE): $(OBJECTS) $(NTUPLE_LIB)
-	$(CXX) -o $@ $^ $(CXXFLAGS) $(DEFINES) -L$(AMSWD)/lib/$(MARCH)$(VERSIONP) -lntuple_slc6_PG $(shell root-config --libs) -lMinuit -lTMVA -lNetx -lGeom -lMathMore -lEG -lTreePlayer -lMLP -lXMLIO $(LIBAUXS) -L/cvmfs/ams.cern.ch/Offline/CERN/2005/lib -lpacklib -lmathlib -lkernlib
+	$(CXX) -o $@ $(OBJECTS) $(CXXFLAGS) $(DEFINES) -L$(NTUPLE_LIBDIR) -lntuple_slc6_PG$(LIB_SUFFIX) $(shell root-config --libs) -lMinuit -lTMVA -lNetx -lGeom -lMathMore -lEG -lTreePlayer -lMLP -lXMLIO $(LIBAUXS) $(CERNLIB)
 
 clean:
 	rm -rf $(BUILDDIR)
+
+# Handle debug target
+debug: OPTFLAGS=-O0 -g
+debug: CERNLIB=-L/cvmfs/ams.cern.ch/Offline/CERN/2005/lib -lpacklib -lmathlib -lkernlib
+debug: LIB_SUFFIX=_debug
+debug: all
 
