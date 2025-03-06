@@ -17,24 +17,6 @@
 namespace Util
 {
     /**
-     * @brief Add input file to the chain
-     *
-     * @param inputFile Input file
-     * @param chain Chain
-     * @return true if the file was added successfully
-     * @return false if the file was not added successfully
-     */
-    bool addInputFile(std::string &inputFile, AMSChain &chain);
-
-    /**
-     * @brief Load particle data from ROOT file
-     * 
-     * @param inputFile Path to the ROOT file containing particle data
-     * @return std::vector<ParticleData> Vector of particle data, empty if loading fails
-     */
-    std::vector<ParticleData> loadParticleData(const std::string &inputFile);
-
-    /**
      * @brief Draw particle trajectory and TOF hits in 3D
      * 
      * @param particle Particle data containing MC truth and TOF hits
@@ -48,10 +30,10 @@ namespace Util
     /**
      * @brief Load particle data from amstreea in ROOT file
      * 
-     * @param inputFile Path to the ROOT file containing MC particle data
+     * @param inputFile Path to the ROOT file containing particle data
      * @return std::vector<ParticleData> Vector of particle data, empty if loading fails
      */
-    std::vector<ParticleData> loadParticleData2(const std::string &inputFile);
+    std::vector<ParticleData> loadParticleData(const std::string &inputFile);
 }
 
 #endif // __UTIL_HH__

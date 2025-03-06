@@ -11,7 +11,6 @@
 #include "TLegend.h"
 
 #include "Util.hh"
-#include "DataProcessor.hh"
 #include "BetaFitter.hh"
 #include "ParticlePropagator.hh"
 
@@ -27,20 +26,9 @@ int main(int argc, char **argv)
     std::string outputFile = argv[2];
     int maxEventsNumber = argc > 3 ? std::stoi(argv[3]) : -1;
 
-    // AMSChain chain;
-    // if (!Util::addInputFile(inputFile, chain))
-    // {
-    //     std::cerr << "Error: could not add input file" << std::endl;
-    //     return 1;
-    // }
-
-    // DataProcessor *processor = new DataProcessor(outputFile);
-    // processor->processEvents(chain, maxEventsNumber);
-
-    // delete processor;
-
     // Load particle data from input file
-    std::vector<ParticleData> particles = Util::loadParticleData2("/home/ams/hxwu/AMSSoft/amsd69n/amsd69n/test_list_-1.root");
+    // /home/ams/hxwu/AMSSoft/amsd69n/amsd69n/test_list_-1.root
+    std::vector<ParticleData> particles = Util::loadParticleData(inputFile);
     if (particles.empty())
     {
         std::cerr << "Error: No particles loaded from input file" << std::endl;

@@ -56,10 +56,6 @@ double BetaFitter::reconstructBeta(const ParticleData *particle,
     ROOT::Math::Minimizer *minimizer =
         ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad");
 
-    // minimizer->SetMaxFunctionCalls(1000);
-    // minimizer->SetMaxIterations(100);
-    // minimizer->SetTolerance(1e-3);
-
     // Create chi-square function
     auto chi2Function = [&](const double *params)
     {
@@ -69,8 +65,8 @@ double BetaFitter::reconstructBeta(const ParticleData *particle,
     minimizer->SetFunction(functor);
 
     // Set parameter limits and initial value
-    double lowerLimit = 1.0 + 1e-4;  // beta > 0
-    double upperLimit = 10.0 - 1e-4; // reasonable upper limit
+    double lowerLimit = 1.0 + 1e-4;  // beta < 1
+    double upperLimit = 10.0 - 1e-4; // beta > 0.1
     initialBetaRecip = TMath::Range(initialBetaRecip, lowerLimit, upperLimit);
     minimizer->SetLimitedVariable(0, "betaReciprocal", initialBetaRecip, 1e-5, lowerLimit, upperLimit);
 
