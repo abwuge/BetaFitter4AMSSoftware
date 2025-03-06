@@ -50,7 +50,7 @@ double BetaFitter::reconstructBeta(const ParticleData *particle,
         if (measuredTimesOri[i] != -1)
             measuredTimes[i] = measuredTimesOri[i] - minTime;
 
-    double initialBetaRecip = 1 / particle->beta;
+    double initialBetaRecip = 1 / particle->betaLinear;
 
     // Set up minimizer
     ROOT::Math::Minimizer *minimizer =

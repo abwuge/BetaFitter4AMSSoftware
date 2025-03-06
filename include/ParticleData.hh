@@ -4,21 +4,19 @@
 struct ParticleData
 {
     // Particle properties
-    float mass;     // Mass
-    float charge;   // Charge
-    float momentum; // Momentum
-    float beta;     // Reconstructed beta value
-
-    // Particle direction
-    float Theta;
-    float Phi;
+    float mass;       // Mass
+    int charge;       // Charge
+    float momentum;   // Momentum
+    float betaLinear; // Reconstructed beta value
 
     // Particle hit information (TOF)
     static const int TOF_MAX_HITS = 4;
+    float TOF_hitZ[TOF_MAX_HITS];
     float TOF_hitTime[TOF_MAX_HITS];
     float TOF_hitTimeError[TOF_MAX_HITS];
 
     // Particle hit information (Tracker)
+    float TRACKER_dir[3]; // only load the first hit direction
     static const int TRACKER_MAX_HITS = 9;
     float TRACKER_hitX[TRACKER_MAX_HITS];
     float TRACKER_hitY[TRACKER_MAX_HITS];
@@ -37,13 +35,12 @@ struct ParticleData
 
     // Constructor to initialize arrays and particle properties with appropriate default values
     ParticleData() : mass(0.0f),
-                     charge(0.0f),
+                     charge(0),
                      momentum(0.0f),
-                     beta(0.0f),
-                     Theta(0.0f),
-                     Phi(0.0f),
+                     betaLinear(0.0f),
                      TOF_hitTime{},
                      TOF_hitTimeError{},
+                     TRACKER_dir{},
                      TRACKER_hitX{},
                      TRACKER_hitY{},
                      TRACKER_hitZ{},

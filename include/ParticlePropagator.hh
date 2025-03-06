@@ -4,6 +4,7 @@
 #include "TrFit.h"
 #include "Betalhd.h"
 #include "AMSPlane.h"
+#include "ParticleData.hh"
 
 class ParticlePropagator : public TrProp
 {
@@ -11,20 +12,21 @@ public:
     // Physical constants
     static constexpr double SPEED_OF_LIGHT = 29.9792458; // Speed of light in cm/ns
     // Z coordinates of TOF layers (cm)
-    static constexpr double TOF_Z[4] = {65.2, 62.1, -62.1, -65.2};
+    // static constexpr double TOF_Z[4] = {65.2, 62.1, -62.1, -65.2};
 
 private:
-    AMSPoint _initPos;      // Initial position of the particle
-    AMSDir _initDir;        // Initial direction of the particle
-    int _chrgSign;          // Sign of the particle charge
-    
+    AMSPoint _initPos; // Initial position of the particle
+    AMSDir _initDir;   // Initial direction of the particle
+    int _chrgSign;     // Sign of the particle charge
+
     AMSPoint _hitPoints[4]; // Hit positions on TOF layers
     AMSDir _hitDirs[4];     // Track directions at hit points
 
     double _momentum; // Momentum of the particle
     double _energy;   // Energy of the particle
 
-public:
+    float tof_z[4]{};
+
     /**
      * Initialize particle propagator with given parameters
      * @param pos Initial position of the particle
@@ -39,6 +41,13 @@ public:
                        double momentum,
                        double mass,
                        int charge);
+
+public:
+    /**
+     * Initialize particle propagator with particle data
+     * @param data Particle data containing initial state
+     */
+    ParticlePropagator(const ParticleData &data);
 
     /**
      * Reset propagator state with new parameters

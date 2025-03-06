@@ -44,31 +44,20 @@ int main(int argc, char **argv)
     // Draw and save plot
     TCanvas *c1 = new TCanvas("c1", "Beta Reconstruction Comparison", 800, 600);
     c1->cd();
-    c1->Print((outputFile + "_trajectory.pdf[").c_str(), "pdf");
 
     // Process each particle
-
     for (const auto &particle : particles)
     {
         // Skip invalid particles
         if (!particle.isMC)
             continue;
         // if (particle.mass < 0)
-            // continue;
+        //     continue;
         if (particle.mcCoo[0] == -1000)
             continue;
 
-        // Create initial state for propagation
-        // TODO: Use MC truth position and direction
-        AMSPoint pos(particle.mcCoo[0], particle.mcCoo[1], particle.mcCoo[2]);
-        AMSDir dir(particle.mcDir[0], particle.mcDir[1], particle.mcDir[2]);
-        // AMSPoint pos(particle.hitX[0], particle.hitY[0], particle.hitZ[0]);
-        // AMSDir dir;
-        // dir.SetTheta(particle.Theta);
-        // dir.SetPhi(particle.Phi);
-
         // Setup particle propagator with initial state
-        ParticlePropagator propagator(pos, dir, particle.mcMomentum, particle.mcMass, particle.mcCharge);
+        ParticlePropagator propagator(particle);
 
         // Prepare arrays for beta reconstruction
         double measuredTimes[4], timeErrors[4];
@@ -84,7 +73,7 @@ int main(int argc, char **argv)
             continue;
 
         // Get linear beta from particle data
-        double linear_beta_rec = particle.beta;
+        double linear_beta_rec = particle.betaLinear;
         if (linear_beta_rec <= 0)
             continue;
 
@@ -94,12 +83,7 @@ int main(int argc, char **argv)
         nonlinearBeta.push_back(nonlinear_beta_rec); // Store nonlinear beta direct
 
         hBetaDiff->Fill(1.0 / nonlinear_beta_rec - 1.0 / particle.mcBeta);
-
-        // Util::drawTrajectory(particle, outputFile + "_trajectory.pdf");
-
     }
-
-    c1->Print((outputFile + "_trajectory.pdf]").c_str(), "pdf");
 
     // Create graphs
     TGraph *grLinear = new TGraph(mcBeta.size(), &mcBeta[0], &linearBeta[0]);

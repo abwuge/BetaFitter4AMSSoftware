@@ -2,8 +2,6 @@
 #include <cmath>
 #include <stdexcept>
 
-constexpr double ParticlePropagator::TOF_Z[4];
-
 ParticlePropagator::ParticlePropagator(const AMSPoint &pos,
                                        const AMSDir &dir,
                                        double momentum,
@@ -24,6 +22,18 @@ ParticlePropagator::ParticlePropagator(const AMSPoint &pos,
     _momentum = momentum;
     _energy = sqrt(mass * mass + momentum * momentum);
     SetMassChrg(mass, charge);
+}
+
+ParticlePropagator::ParticlePropagator(const ParticleData &data)
+    // : ParticlePropagator(AMSPoint(data.mcCoo[0], data.mcCoo[1], data.mcCoo[2]),
+    //                      AMSDir(data.mcDir[0], data.mcDir[1], data.mcDir[2]),
+    //                      data.mcMomentum, data.mcMass, data.mcCharge)
+    : ParticlePropagator(AMSPoint(data.TRACKER_hitX[0], data.TRACKER_hitY[0], data.TRACKER_hitZ[0]),
+                         AMSDir(data.TRACKER_dir[0], data.TRACKER_dir[1], data.TRACKER_dir[2]),
+                         data.momentum, data.mass, data.charge)
+{
+    for (int i = 0; i < 4; ++i)
+        tof_z[i] = data.TOF_hitZ[i];
 }
 
 double ParticlePropagator::GetBeta() const
@@ -71,7 +81,7 @@ double ParticlePropagator::PropagateToZ(double z_target)
         return -1;
 
     // Update kinematics with energy loss
-    UpdateWithEnergyLoss(start_point, direction, z_target);
+    // UpdateWithEnergyLoss(start_point, direction, z_target);
 
     return GetBeta();
 }
@@ -85,7 +95,7 @@ bool ParticlePropagator::PropagateToTOF(double hitX[4], double hitY[4],
     for (int i = 0; i < 4; ++i)
     {
         double z_start = _p0z;
-        double z_target = TOF_Z[i];
+        double z_target = tof_z[i];
         double dz = (z_target - z_start) / steps_per_layer;
         double layer_length = 0;
         double layer_time = 0;
