@@ -3,12 +3,8 @@
 #include <vector>
 
 #include "amschain.h"
-#include "TH1F.h"
 #include "TFile.h"
-#include "TCanvas.h"
-#include "TStyle.h"
-#include "TGraph.h"
-#include "TLegend.h"
+#include "TTree.h"
 
 #include "Util.hh"
 #include "BetaFitter.hh"
@@ -18,7 +14,7 @@ int main(int argc, char **argv)
 {
     if (argc < 3)
     {
-        std::cout << "Usage: " << argv[0] << " <inputFile> <outputFile>" << std::endl;
+        std::cout << "Usage: " << argv[0] << " <inputFile.root> <outputFile.root>" << std::endl;
         return 1;
     }
 
@@ -26,7 +22,6 @@ int main(int argc, char **argv)
     std::string outputFile = argv[2];
 
     // Load particle data from input file
-    // /home/ams/hxwu/AMSSoft/amsd69n/amsd69n/test_list_-1.root
     std::vector<ParticleData> particles = Util::loadParticleData(inputFile);
     if (particles.empty())
     {
@@ -34,16 +29,24 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // Create vectors for graph points
-    std::vector<double> mcBeta;
-    std::vector<double> linearBeta;
-    std::vector<double> nonlinearBeta;
+    // Create output ROOT file
+    TFile *outFile = new TFile(outputFile.c_str(), "RECREATE");
+    if (!outFile || outFile->IsZombie())
+    {
+        std::cerr << "Error: Could not create output file" << std::endl;
+        return 1;
+    }
 
-    TH1F *hBetaDiff = new TH1F("hBetaDiff", "1/#beta_{rec} - 1/#beta_{MC};1/#beta_{rec} - 1/#beta_{MC};Events", 100, -0.5, 0.5);
+    // Create TTree
+    TTree *tree = new TTree("betaTree", "Beta Reconstruction Results");
+    double mcBeta = 0;
+    double linearBeta = 0;
+    double nonlinearBeta = 0;
 
-    // Draw and save plot
-    TCanvas *c1 = new TCanvas("c1", "Beta Reconstruction Comparison", 800, 600);
-    c1->cd();
+    // Set up branches
+    tree->Branch("mcBeta", &mcBeta, "mcBeta/D");
+    tree->Branch("linearBeta", &linearBeta, "linearBeta/D");
+    tree->Branch("nonlinearBeta", &nonlinearBeta, "nonlinearBeta/D");
 
     // Process each particle
     for (const auto &particle : particles)
@@ -67,77 +70,23 @@ int main(int argc, char **argv)
             timeErrors[i] = particle.TOF_hitTimeError[i];
         }
 
-        // Reconstruct beta with nonlinear algorithm
-        double nonlinear_beta_rec = 1 / BetaFitter::reconstructBeta(&particle, propagator, measuredTimes, timeErrors);
-        if (nonlinear_beta_rec <= 0)
+        // Get beta values
+        mcBeta = particle.mcBeta;
+        linearBeta = particle.betaLinear;
+        nonlinearBeta = 1 / BetaFitter::reconstructBeta(&particle, propagator, measuredTimes, timeErrors);
+
+        // Skip invalid reconstructions
+        if (nonlinearBeta <= 0 || linearBeta <= 0)
             continue;
 
-        // Get linear beta from particle data
-        double linear_beta_rec = particle.betaLinear;
-        if (linear_beta_rec <= 0)
-            continue;
-
-        // Store values for plotting
-        mcBeta.push_back(particle.mcBeta);
-        linearBeta.push_back(linear_beta_rec);
-        nonlinearBeta.push_back(nonlinear_beta_rec); // Store nonlinear beta direct
-
-        hBetaDiff->Fill(1.0 / nonlinear_beta_rec - 1.0 / particle.mcBeta);
+        // Fill tree
+        tree->Fill();
     }
 
-    // Create graphs
-    TGraph *grLinear = new TGraph(mcBeta.size(), &mcBeta[0], &linearBeta[0]);
-    TGraph *grNonlinear = new TGraph(mcBeta.size(), &mcBeta[0], &nonlinearBeta[0]);
-
-    // Set graph styles
-    grLinear->SetMarkerStyle(20);
-    grLinear->SetMarkerColor(kBlue);
-    grLinear->SetLineColor(kBlue);
-    grLinear->SetMarkerSize(0.5);
-
-    grNonlinear->SetMarkerStyle(21);
-    grNonlinear->SetMarkerColor(kRed);
-    grNonlinear->SetLineColor(kRed);
-    grNonlinear->SetMarkerSize(0.5);
-
-    // Set up drawing
-    grLinear->SetTitle("Beta Reconstruction Comparison");
-    grLinear->GetXaxis()->SetTitle("MC Beta");
-    grLinear->GetXaxis()->SetRangeUser(0, 1);
-    grLinear->GetYaxis()->SetTitle("Reconstructed Beta");
-    grLinear->GetYaxis()->SetRangeUser(0, 1);
-
-    // Draw graphs
-    grLinear->Draw("AP");
-    grNonlinear->Draw("P SAME");
-
-    // Add legend
-    TLegend *legend = new TLegend(0.15, 0.7, 0.45, 0.85);
-    legend->AddEntry(grLinear, "Linear Reconstruction", "p");
-    legend->AddEntry(grNonlinear, "Nonlinear Reconstruction", "p");
-    legend->Draw();
-
-    // Draw diagonal reference line (perfect reconstruction)
-    TGraph *grReference = new TGraph(2);
-    grReference->SetPoint(0, 0, 0);
-    grReference->SetPoint(1, 1, 1);
-    grReference->SetLineStyle(2);
-    grReference->SetLineColor(kGreen);
-    grReference->Draw("L SAME");
-
-    // Save plot
-    c1->SaveAs((outputFile + "_betaComparison.pdf").c_str());
-
-    hBetaDiff->Draw();
-    c1->SaveAs((outputFile + "_betaDiff.pdf").c_str());
-
-    // Clean up
-    delete hBetaDiff;
-    delete grLinear;
-    delete grNonlinear;
-    delete grReference;
-    delete legend;
-    delete c1;
+    // Write and close
+    tree->Write();
+    outFile->Close();
+    delete outFile;
 
     return 0;
 }
