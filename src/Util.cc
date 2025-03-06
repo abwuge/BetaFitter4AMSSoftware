@@ -43,12 +43,10 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     tree->SetBranchAddress("mpar", &mpar);
     tree->SetBranchAddress("mmom", &mmom);
     tree->SetBranchAddress("mch", &mch);
-    tree->SetBranchAddress("mmass", &mmass);
     tree->SetBranchAddress("mevcoo1", mevcoo1);
     tree->SetBranchAddress("mevdir1", mevdir1);
     tree->SetBranchAddress("mevmom1", mevmom1);
     tree->SetBranchAddress("tof_betah", &tof_betah);
-    tree->SetBranchAddress("tof_betahmc", &tof_betahmc);
     tree->SetBranchAddress("tof_tl", tof_tl);
     tree->SetBranchAddress("tof_etl", tof_etl);
 
@@ -57,28 +55,29 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     for (Long64_t i = 0; i < nEntries; ++i)
     {
         tree->GetEntry(i);
-        
+
         ParticleData data;
         data.isMC = true;
         data.mcMomentum = mmom;
         data.mcCharge = mch;
         data.mcMass = mmass;
-        data.mcBeta = tof_betahmc;
         data.beta = tof_betah;
-        
+        data.mcBeta = mmom / sqrt(mmom * mmom + mmass * mmass);
+
         data.mcCoo[0] = mevcoo1[0][0];
         data.mcCoo[1] = mevcoo1[0][1];
         data.mcCoo[2] = mevcoo1[0][2];
-        
+
         data.mcDir[0] = mevdir1[0][0];
         data.mcDir[1] = mevdir1[0][1];
         data.mcDir[2] = mevdir1[0][2];
 
-        for (int j = 0; j < 4; ++j) {
-            data.hitTime[j] = tof_tl[j];
-            data.hitTimeError[j] = tof_etl[j];
+        for (int j = 0; j < 4; ++j)
+        {
+            data.TOF_hitTime[j] = tof_tl[j];
+            data.TOF_hitTimeError[j] = tof_etl[j];
         }
-        
+
         particles.push_back(data);
     }
 
@@ -88,6 +87,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
 
 bool Util::drawTrajectory(const ParticleData &particle, const std::string &outputPath, int nPoints)
 {
+#if false
     try
     {
         // Create canvas and 3D view
@@ -175,4 +175,6 @@ bool Util::drawTrajectory(const ParticleData &particle, const std::string &outpu
     {
         return false;
     }
+#endif
+    return false;
 }

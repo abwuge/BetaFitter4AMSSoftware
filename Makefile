@@ -174,4 +174,3 @@ debug: OPTFLAGS=-O0 -g
 debug: CERNLIB=-L/cvmfs/ams.cern.ch/Offline/CERN/2005/lib -lpacklib -lmathlib -lkernlib
 debug: LIB_SUFFIX=_debug
 debug: all
-

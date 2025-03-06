@@ -5,31 +5,35 @@ struct ParticleData
 {
     // Particle properties
     float mass;     // Mass
-    float charge;   // Charge (Always positive)
-    float momentum; // Momentum (positive if charge > 0, negative if charge < 0)
+    float charge;   // Charge
+    float momentum; // Momentum
     float beta;     // Reconstructed beta value
 
     // Particle direction
     float Theta;
     float Phi;
 
-    // Particle hit information
-    static const int MAX_HITS = 4; // Maximum number of hits
-    float hitX[MAX_HITS];
-    float hitY[MAX_HITS];
-    float hitZ[MAX_HITS];
-    float hitTime[MAX_HITS];
-    float hitTimeError[MAX_HITS];
+    // Particle hit information (TOF)
+    static const int TOF_MAX_HITS = 4;
+    float TOF_hitTime[TOF_MAX_HITS];
+    float TOF_hitTimeError[TOF_MAX_HITS];
+
+    // Particle hit information (Tracker)
+    static const int TRACKER_MAX_HITS = 9;
+    float TRACKER_hitX[TRACKER_MAX_HITS];
+    float TRACKER_hitY[TRACKER_MAX_HITS];
+    float TRACKER_hitZ[TRACKER_MAX_HITS];
+    float TRACKER_hitError[TRACKER_MAX_HITS];
 
     // MC truth information
+    bool isMC;        // Flag to indicate if it's MC particle
+    int mcPdgId;      // MC particle PDG ID
+    int mcCharge;     // MC truth charge
     float mcBeta;     // MC truth beta
     float mcMomentum; // MC truth momentum
     float mcMass;     // MC truth mass
     float mcCoo[3];   // MC truth initial position (cm)
     float mcDir[3];   // MC truth initial direction cosines
-    int mcCharge;     // MC truth charge
-    int mcPdgId;      // MC particle PDG ID
-    bool isMC;        // Flag to indicate if it's MC particle
 
     // Constructor to initialize arrays and particle properties with appropriate default values
     ParticleData() : mass(0.0f),
@@ -38,29 +42,21 @@ struct ParticleData
                      beta(0.0f),
                      Theta(0.0f),
                      Phi(0.0f),
+                     TOF_hitTime{},
+                     TOF_hitTimeError{},
+                     TRACKER_hitX{},
+                     TRACKER_hitY{},
+                     TRACKER_hitZ{},
+                     TRACKER_hitError{},
+                     isMC(false),
+                     mcPdgId(0),
+                     mcCharge(0),
                      mcBeta(0.0f),
                      mcMomentum(0.0f),
                      mcMass(0.0f),
-                     mcCharge(0),
-                     mcPdgId(0),
-                     isMC(false)
+                     mcCoo{},
+                     mcDir{}
     {
-        // Initialize arrays with zeros
-        for (int i = 0; i < MAX_HITS; i++)
-        {
-            hitX[i] = 0.0f;
-            hitY[i] = 0.0f;
-            hitZ[i] = 0.0f;
-            hitTime[i] = 0.0f;
-            hitTimeError[i] = 0.0f;
-        }
-        
-        // Initialize MC position and direction arrays
-        for (int i = 0; i < 3; i++)
-        {
-            mcCoo[i] = 0.0f;
-            mcDir[i] = 0.0f;
-        }
     }
 };
 

@@ -18,13 +18,12 @@ int main(int argc, char **argv)
 {
     if (argc < 3)
     {
-        std::cout << "Usage: " << argv[0] << " <inputFile> <outputFile.root> <maxEventsNumber>" << std::endl;
+        std::cout << "Usage: " << argv[0] << " <inputFile> <outputFile>" << std::endl;
         return 1;
     }
 
     std::string inputFile = argv[1];
     std::string outputFile = argv[2];
-    int maxEventsNumber = argc > 3 ? std::stoi(argv[3]) : -1;
 
     // Load particle data from input file
     // /home/ams/hxwu/AMSSoft/amsd69n/amsd69n/test_list_-1.root
@@ -75,8 +74,8 @@ int main(int argc, char **argv)
         double measuredTimes[4], timeErrors[4];
         for (int i = 0; i < 4; ++i)
         {
-            measuredTimes[i] = particle.hitTime[i];
-            timeErrors[i] = particle.hitTimeError[i];
+            measuredTimes[i] = particle.TOF_hitTime[i];
+            timeErrors[i] = particle.TOF_hitTimeError[i];
         }
 
         // Reconstruct beta with nonlinear algorithm
