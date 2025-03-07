@@ -40,7 +40,7 @@ private:
                        const AMSDir &dir,
                        double momentum,
                        double mass,
-                       int charge);
+                       double charge);
 
 public:
     /**

@@ -12,14 +12,14 @@
 #include "TDatabasePDG.h"
 
 // Implementation of getMassFromPDG function
-float Util::getMassFromPDG(int pdgId, int charge)
+float Util::getMassFromPDG(int pdgId, double charge)
 {
     switch (pdgId)
     {
     case 69: // O16
         return 14.899169;
     default:
-        return 2 * charge * 0.9314941; // Suppose its' number of nutron equals to number of proton
+        return 2 * charge * 0.9314941; // Suppose its' number of neutron equals to number of proton
     }
 }
 
@@ -126,8 +126,9 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
             data.TRACKER_hitError[j] = 6.3e-4;
         }
 
-        data.charge = (int)((tk_qin[0][2] < 2.5 ? tk_q[1] : tk_qin[0][2]) + 0.5);
-        data.mass = 2 * data.charge * 0.9314941; // Suppose its' number of nutron equals to number of proton
+        data.charge = std::abs(tk_q[1]);
+        data.charge = (data.charge < 2.5 ? data.charge : tk_qin[0][2]);
+        data.mass = 2 * data.charge * 0.9314941; // Suppose its' number of neutron equals to number of proton
         data.betaLinear = tof_betah;
         data.momentum = data.mass * data.betaLinear / sqrt(1 - data.betaLinear * data.betaLinear);
 

@@ -43,7 +43,7 @@ namespace Util
      * @param pdgId Geant3 particle ID or Geant4 PDG ID
      * @return float Mass in GeV/c^2, 0 if particle not recognized
      */
-    float getMassFromPDG(int pdgId, int charge);
+    float getMassFromPDG(int pdgId, double charge);
 }
 
 #endif // __UTIL_HH__

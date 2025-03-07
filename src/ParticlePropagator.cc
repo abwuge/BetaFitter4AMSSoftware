@@ -6,7 +6,7 @@ ParticlePropagator::ParticlePropagator(const AMSPoint &pos,
                                        const AMSDir &dir,
                                        double momentum,
                                        double mass,
-                                       int charge)
+                                       double charge)
     : TrProp(pos, dir), _initPos(pos), _initDir(dir)
 {
     if (charge == 0)

@@ -5,7 +5,7 @@ struct ParticleData
 {
     // Particle properties
     float mass;       // Mass
-    int charge;       // Charge
+    float charge;     // Charge
     float momentum;   // Momentum
     float betaLinear; // Reconstructed beta value
 
