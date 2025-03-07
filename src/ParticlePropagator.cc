@@ -44,42 +44,19 @@ double ParticlePropagator::GetBeta() const
     return sqrt(1.0 - (_mass * _mass) / (_energy * _energy));
 }
 
-double ParticlePropagator::GetGamma() const
-{
-    return _energy / _mass;
-}
-
 double ParticlePropagator::GetMomentum() const
 {
     return _momentum;
 }
 
-void ParticlePropagator::UpdateWithEnergyLoss(const AMSPoint &start_point,
-                                              const AMSDir &direction,
-                                              double z_target)
+void ParticlePropagator::UpdateWithEnergyLoss(int i)
 {
-    // Calculate energy loss using Betalhd
-    double energy_loss = _rigidity ? Betalhd::CalculateEnergyLoss(start_point, direction, _rigidity,
-                                                                  start_point.z(), z_target,
-                                                                  _mass, _chrg, 0)
-                                   : 0;
-
     // Update energy ensuring it stays above rest mass
-    _energy = std::max(_mass, _energy - energy_loss);
+    _energy = std::max(_mass, _energy - energyLoss[i]);
 
     // Update momentum and rigidity
     _momentum = sqrt(_energy * _energy - _mass * _mass);
     _rigidity = _momentum / _chrg;
-}
-
-void ParticlePropagator::UpdateWithEnergyLoss(int i)
-{
-// Update energy ensuring it stays above rest mass
-_energy = std::max(_mass, _energy - energyLoss[i]);
-
-// Update momentum and rigidity
-_momentum = sqrt(_energy * _energy - _mass * _mass);
-_rigidity = _momentum / _chrg;
 }
 
 bool ParticlePropagator::PropagateToTOF(double hitX[4], double hitY[4],
@@ -98,22 +75,14 @@ bool ParticlePropagator::PropagateToTOF(double hitX[4], double hitY[4],
         if (current_beta <= 0)
             return false;
 
-        // Store starting position for energy loss calculation
-        AMSPoint start_point = GetP0();
-        AMSDir start_dir = GetDir();
-
         // Propagate to the TOF layer
         double layer_length = TrProp::Propagate(z_target);
         if (layer_length < 0)
             return false;
 
-        // Store hit position and direction for this layer
-        _hitPoints[i] = GetP0();
-        _hitDirs[i] = GetDir();
-
         // Record hit coordinates
-        hitX[i] = _hitPoints[i].x();
-        hitY[i] = _hitPoints[i].y();
+        hitX[i] = _p0x;
+        hitY[i] = _p0y;
 
         // Calculate time to reach this layer
         double layer_time = layer_length / (current_beta * SPEED_OF_LIGHT);
@@ -133,12 +102,6 @@ bool ParticlePropagator::PropagateToTOF(double hitX[4], double hitY[4],
 
 bool ParticlePropagator::resetPropagator(double beta)
 {
-    if (beta <= 0 || beta >= 1)
-    {
-        printf("ParticlePropagator: Invalid beta value. Must be between 0 and 1.\n");
-        return false;
-    }
-
     _momentum = _mass * beta / sqrt(1 - beta * beta);
     _momentum *= _chrgSign;
     _energy = sqrt(_mass * _mass + _momentum * _momentum);
@@ -147,8 +110,8 @@ bool ParticlePropagator::resetPropagator(double beta)
     _p0x = _initPos.x();
     _p0y = _initPos.y();
     _p0z = _initPos.z();
-    _dxdz = (_initDir.z() != 0) ? _initDir.x() / _initDir.z() : 0;
-    _dydz = (_initDir.z() != 0) ? _initDir.y() / _initDir.z() : 0;
+    _dxdz = _initDir.x() / _initDir.z();
+    _dydz = _initDir.y() / _initDir.z();
 
     return true;
 }

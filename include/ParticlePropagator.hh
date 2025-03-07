@@ -17,9 +17,6 @@ private:
     AMSDir _initDir;   // Initial direction of the particle
     int _chrgSign;     // Sign of the particle charge
 
-    AMSPoint _hitPoints[ParticleData::TOF_MAX_HITS]; // Hit positions on TOF layers
-    AMSDir _hitDirs[ParticleData::TOF_MAX_HITS];     // Track directions at hit points
-
     double _momentum; // Momentum of the particle
     double _energy;   // Energy of the particle
 
@@ -73,12 +70,6 @@ public:
     double GetBeta() const;
 
     /**
-     * Get particle's current gamma factor
-     * @return Gamma value
-     */
-    double GetGamma() const;
-
-    /**
      * Get particle's current energy
      * @return Energy in GeV
      */
@@ -89,18 +80,6 @@ public:
      * @return Momentum in GeV/c
      */
     double GetMomentum() const;
-
-    /**
-     * Get array of hit positions on TOF layers
-     * @return Array of hit positions
-     */
-    const AMSPoint *GetHitPoints() const { return _hitPoints; }
-
-    /**
-     * Get array of particle directions at TOF hits
-     * @return Array of directions
-     */
-    const AMSDir *GetHitDirs() const { return _hitDirs; }
 
 private:
     /**
