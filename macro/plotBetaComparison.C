@@ -23,6 +23,10 @@ void plotBetaComparison(const char *fileName = "test.root",
 {
     // Set batch mode to avoid GUI related issues
     gROOT->SetBatch(true);
+    gROOT->SetStyle("Pub");
+    gStyle->SetLineWidth(2);
+    gStyle->SetFrameLineWidth(2);
+    gStyle->SetEndErrorSize(20);
 
     // Open the ROOT file
     TFile *file = TFile::Open(fileName, "READ");
@@ -70,10 +74,6 @@ void plotBetaComparison(const char *fileName = "test.root",
 
     double yMinRes = -0.2, yMaxRes = 1.2;
 
-    // Create canvas
-    TCanvas *canvas = new TCanvas("canvas", "Beta Residuals Comparison", 800, 600);
-    canvas->Divide(1, 2);
-
     // Create histograms for the residuals plot (1/beta_rec - 1/beta_mc)
     TH2F *hNonlinearResVsMC = new TH2F("hNonlinearResVsMC",
                                        "Non-linear Reconstruction Residuals;#beta_{MC};1/#beta_{non-linear} - 1/#beta_{MC}",
@@ -81,6 +81,9 @@ void plotBetaComparison(const char *fileName = "test.root",
     TH2F *hLinearResVsMC = new TH2F("hLinearResVsMC",
                                     "Linear Reconstruction Residuals;#beta_{MC};1/#beta_{linear} - 1/#beta_{MC}",
                                     nBinsX, xMin, xMax, nBinsY, yMinRes, yMaxRes);
+
+    hNonlinearResVsMC->SetMinimum(1);
+    hLinearResVsMC->SetMinimum(1);
 
     // Fill histograms
     Long64_t nEntries = tree->GetEntries();
@@ -97,45 +100,11 @@ void plotBetaComparison(const char *fileName = "test.root",
         hLinearResVsMC->Fill(mcBeta, linearRes);
     }
 
-    // Set color palette for better visualization
-    gStyle->SetPalette(1);
-    gStyle->SetOptStat(0);
-
     // Arrays to store fit results
     const int nProfiles = nBinsX;
     double mcBetaValues[nProfiles];
     double nonlinearMean[nProfiles], nonlinearError[nProfiles];
     double linearMean[nProfiles], linearError[nProfiles];
-
-    // Process upper plot (nonlinear beta residuals)
-    canvas->cd(1);
-    gPad->SetGridx();
-    gPad->SetGridy();
-    gPad->SetLogz();
-
-    hNonlinearResVsMC->Draw("COLZ");
-
-    // Perfect residual reference line (zero residual)
-    TF1 *perfectLine1 = new TF1("perfectLine1", "0", xMin, xMax);
-    perfectLine1->SetLineColor(kRed);
-    perfectLine1->SetLineStyle(2);
-    perfectLine1->SetLineWidth(2);
-    perfectLine1->Draw("SAME");
-
-    // Process lower plot (linear beta residuals)
-    canvas->cd(2);
-    gPad->SetGridx();
-    gPad->SetGridy();
-    gPad->SetLogz();
-
-    hLinearResVsMC->Draw("COLZ");
-
-    // Perfect residual reference line (zero residual)
-    TF1 *perfectLine2 = new TF1("perfectLine2", "0", xMin, xMax);
-    perfectLine2->SetLineColor(kRed);
-    perfectLine2->SetLineStyle(2);
-    perfectLine2->SetLineWidth(2);
-    perfectLine2->Draw("SAME");
 
     // Print table header before the loop
     std::cout << std::endl;
@@ -214,29 +183,106 @@ void plotBetaComparison(const char *fileName = "test.root",
                nonlinearMean[bin], linearMean[bin]);
     }
 
-    // Create and draw TGraphErrors for the Gaussian means of the residuals
-    canvas->cd(1);
+    // Create canvas with multiple pages
+    TCanvas *canvas = new TCanvas("canvas", "Beta Residuals Comparison", 3508, 2480);
+    canvas->Print(Form("%s[", outputName)); // Open PDF file
+
+    // First page - Non-linear beta residuals
+    TCanvas *c1 = new TCanvas("c1", "Non-linear Beta Residuals", 3508, 2480);
+    c1->SetGridx();
+    c1->SetGridy();
+    c1->SetLogz();
+
+    hNonlinearResVsMC->Draw("COLZ");
+
+    // Perfect residual reference line (zero residual)
+    TF1 *perfectLine1 = new TF1("perfectLine1", "0", xMin, xMax);
+    perfectLine1->SetLineColor(kRed);
+    perfectLine1->SetLineStyle(2);
+    perfectLine1->Draw("SAME");
+
+    // Create and draw TGraphErrors for nonlinear residuals
     TGraphErrors *grNonlinear = new TGraphErrors(nProfiles, mcBetaValues, nonlinearMean, 0, nonlinearError);
     grNonlinear->SetMarkerStyle(20);
-    grNonlinear->SetMarkerSize(0.8);
     grNonlinear->SetMarkerColor(kBlack);
+    grNonlinear->SetMarkerSize(3.0);
     grNonlinear->Draw("P");
 
-    canvas->cd(2);
+    c1->Print(outputName);
+
+    // Second page - Linear beta residuals
+    TCanvas *c2 = new TCanvas("c2", "Linear Beta Residuals", 3508, 2480);
+    c2->SetGridx();
+    c2->SetGridy();
+    c2->SetLogz();
+
+    hLinearResVsMC->Draw("COLZ");
+
+    // Perfect residual reference line (zero residual)
+    TF1 *perfectLine2 = new TF1("perfectLine2", "0", xMin, xMax);
+    perfectLine2->SetLineColor(kRed);
+    perfectLine2->SetLineStyle(2);
+    perfectLine2->Draw("SAME");
+
+    // Create and draw TGraphErrors for linear residuals
     TGraphErrors *grLinear = new TGraphErrors(nProfiles, mcBetaValues, linearMean, 0, linearError);
     grLinear->SetMarkerStyle(20);
-    grLinear->SetMarkerSize(0.8);
     grLinear->SetMarkerColor(kBlack);
+    grLinear->SetMarkerSize(3.0);
     grLinear->Draw("P");
 
-    // Save the canvas
-    canvas->SaveAs(outputName);
+    c2->Print(outputName);
 
-    // Clean up - make sure to delete objects in the correct order
+    // Third page - Comparison of TGraphErrors
+    TCanvas *c3 = new TCanvas("c3", "Beta Reconstruction Methods Comparison", 3508, 2480);
+    c3->SetGridx();
+    c3->SetGridy();
+
+    // Create a frame for the comparison plot
+    TH2F *hFrame = new TH2F("hFrame", "Beta Reconstruction Methods Comparison;#beta_{MC};1/#beta_{rec} - 1/#beta_{MC}",
+                            100, xMin, xMax, 100, yMinRes, yMaxRes);
+    hFrame->Draw();
+
+    // Draw both graphs with different styles
+    grNonlinear->SetMarkerStyle(20);
+    grNonlinear->SetMarkerColor(kBlue);
+    grNonlinear->SetLineColor(kBlue);
+    grNonlinear->SetMarkerSize(3.0);
+    grNonlinear->Draw("LP");
+
+    grLinear->SetMarkerStyle(21);
+    grLinear->SetMarkerColor(kRed);
+    grLinear->SetLineColor(kRed);
+    grLinear->SetMarkerSize(3.0);
+    grLinear->Draw("LP");
+
+    // Add legend
+    TLegend *legend = new TLegend(0.55, 0.7, 0.85, 0.85);
+    legend->AddEntry(grNonlinear, "Non-linear Method", "lp");
+    legend->AddEntry(grLinear, "Linear Method", "lp");
+    legend->SetBorderSize(0);
+    legend->Draw();
+
+    // Draw zero line
+    TF1 *zeroLine = new TF1("zeroLine", "0", xMin, xMax);
+    zeroLine->SetLineStyle(2);
+    zeroLine->SetLineColor(kGray + 2);
+    zeroLine->Draw("SAME");
+
+    c3->Print(outputName);
+    c3->Print(Form("%s]", outputName)); // Close PDF file
+
+    // Clean up
+    delete zeroLine;
+    delete legend;
+    delete hFrame;
+    delete c3;
     delete grNonlinear;
     delete grLinear;
     delete perfectLine1;
     delete perfectLine2;
+    delete c2;
+    delete c1;
     delete hNonlinearResVsMC;
     delete hLinearResVsMC;
     delete canvas;
