@@ -154,6 +154,11 @@ void plotBetaComparison(const char *fileName = "test.root",
     perfectLine2->SetLineWidth(2);
     perfectLine2->Draw("SAME");
 
+    // Print table header before the loop
+    std::cout << std::endl;
+    std::cout << "Bin\tBeta\t\tProj_NL\t\tProj_L\t\tNL_mean\t\tL_mean" << std::endl;
+    std::cout << std::string(80, '-') << std::endl;
+
     double binWidth = (xMax - xMin) / nBinsX;
     for (int bin = 0; bin < nBinsX; ++bin)
     {
@@ -220,11 +225,10 @@ void plotBetaComparison(const char *fileName = "test.root",
         }
         delete projLinear;
 
-        std::cout << "Bin " << bin << " (" << binCenter << "): "
-                 << " Proj_NL=" << projNLEntries
-                 << " Proj_L=" << projLEntries
-                 << " NL mean=" << nonlinearMean[bin] 
-                 << " L mean=" << linearMean[bin] << std::endl;
+        // Print data in aligned columns using tabs
+        printf("%d\t%.6f\t%d\t\t%d\t\t%.6f\t%.6f\n",
+               bin, binCenter, projNLEntries, projLEntries,
+               nonlinearMean[bin], linearMean[bin]);
     }
 
     // Create and draw TGraphErrors for the Gaussian means of the residuals
