@@ -121,7 +121,7 @@ bool ParticlePropagator::PropagateToTOF(double hitX[4], double hitY[4],
             layer_time += len / (current_beta * SPEED_OF_LIGHT);
 
             // Update energy loss after each step
-            UpdateWithEnergyLoss(start_point, start_dir, current_z_target);
+            // UpdateWithEnergyLoss(start_point, start_dir, current_z_target);
         }
 
         // Store hit position and direction for this layer
