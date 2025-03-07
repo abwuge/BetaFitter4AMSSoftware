@@ -17,14 +17,6 @@
 namespace Util
 {
     /**
-     * @brief Load particle data from amstreea in ROOT file
-     *
-     * @param inputFile Path to the ROOT file containing particle data
-     * @return std::vector<ParticleData> Vector of particle data, empty if loading fails
-     */
-    std::vector<ParticleData> loadParticleData(const std::string &inputFile);
-
-    /**
      * @brief Get particle mass from PDG ID
      *
      * Supports Geant3 particle IDs and Geant4 PDG IDs if no Geant3 counterpart is found
@@ -33,6 +25,14 @@ namespace Util
      * @return float Mass in GeV/c^2, 0 if particle not recognized
      */
     float getMassFromPDG(int pdgId, double charge);
+
+    /**
+     * @brief Load particle data from amstreea in ROOT file
+     *
+     * @param inputFile Path to the ROOT file containing particle data
+     * @return std::vector<ParticleData> Vector of particle data, empty if loading fails
+     */
+    std::vector<ParticleData> loadParticleData(const std::string &inputFile);
 }
 
 #endif // __UTIL_HH__

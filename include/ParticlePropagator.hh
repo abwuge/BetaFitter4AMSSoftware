@@ -11,21 +11,20 @@ class ParticlePropagator : public TrProp
 public:
     // Physical constants
     static constexpr double SPEED_OF_LIGHT = 29.9792458; // Speed of light in cm/ns
-    // Z coordinates of TOF layers (cm)
-    // static constexpr double TOF_Z[4] = {65.2, 62.1, -62.1, -65.2};
 
 private:
     AMSPoint _initPos; // Initial position of the particle
     AMSDir _initDir;   // Initial direction of the particle
     int _chrgSign;     // Sign of the particle charge
 
-    AMSPoint _hitPoints[4]; // Hit positions on TOF layers
-    AMSDir _hitDirs[4];     // Track directions at hit points
+    AMSPoint _hitPoints[ParticleData::TOF_MAX_HITS]; // Hit positions on TOF layers
+    AMSDir _hitDirs[ParticleData::TOF_MAX_HITS];     // Track directions at hit points
 
     double _momentum; // Momentum of the particle
     double _energy;   // Energy of the particle
 
-    float tof_z[4]{};
+    float tof_z[ParticleData::TOF_MAX_HITS]{};
+    float energyLoss[ParticleData::TOF_MAX_HITS]{};
 
     /**
      * Initialize particle propagator with given parameters
@@ -55,13 +54,6 @@ public:
      * @return true if reset successful, false if beta is invalid
      */
     bool resetPropagator(double beta);
-
-    /**
-     * Propagate particle to specified z position with energy loss
-     * @param z_target Target z coordinate to propagate to
-     * @return Beta value at target position, -1 if propagation failed
-     */
-    double PropagateToZ(double z_target);
 
     /**
      * Propagate particle through all TOF layers
@@ -120,6 +112,12 @@ private:
     void UpdateWithEnergyLoss(const AMSPoint &start_point,
                               const AMSDir &direction,
                               double z_target);
+
+    /**
+     * Update particle kinematics considering energy loss using TOF energy deposit
+     * @param i Index of the TOF layer
+     */
+    void UpdateWithEnergyLoss(int i);
 };
 
 #endif

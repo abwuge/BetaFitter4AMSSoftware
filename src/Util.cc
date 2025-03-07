@@ -54,6 +54,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     float tof_betah = 0.0f;
     float tof_tl[4] = {0};
     float tof_pos[4][3] = {0};
+    float tof_edep[4] = {0};
     float tk_pos[9][3] = {0};
     float tk_dir[9][3] = {0};
     float tk_q[2] = {0};
@@ -73,6 +74,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     tree->SetBranchAddress("tof_betah", &tof_betah);
     tree->SetBranchAddress("tof_tl", tof_tl);
     tree->SetBranchAddress("tof_pos", tof_pos);
+    tree->SetBranchAddress("tof_edep", tof_edep);
     tree->SetBranchAddress("tk_pos", tk_pos);
     tree->SetBranchAddress("tk_dir", tk_dir);
     tree->SetBranchAddress("tk_q", tk_q);
@@ -111,6 +113,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
             data.TOF_hitTime[j] = tof_tl[j];
             // TODO: SO FAR it's constant, but it might not be correct
             data.TOF_hitTimeError[j] = 0.1544809;
+            data.TOF_hitEdep[j] = tof_edep[j] * 1e-3;
         }
 
         data.TRACKER_dir[0] = tk_dir[0][0];

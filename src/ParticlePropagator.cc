@@ -33,7 +33,10 @@ ParticlePropagator::ParticlePropagator(const ParticleData &data)
                          data.momentum, data.mass, data.charge)
 {
     for (int i = 0; i < 4; ++i)
+    {
         tof_z[i] = data.TOF_hitZ[i];
+        energyLoss[i] = data.TOF_hitEdep[i];
+    }
 }
 
 double ParticlePropagator::GetBeta() const
@@ -69,60 +72,40 @@ void ParticlePropagator::UpdateWithEnergyLoss(const AMSPoint &start_point,
     _rigidity = _momentum / _chrg;
 }
 
-double ParticlePropagator::PropagateToZ(double z_target)
+void ParticlePropagator::UpdateWithEnergyLoss(int i)
 {
-    // Save current state
-    AMSPoint start_point = GetP0();
-    AMSDir direction = GetDir();
+// Update energy ensuring it stays above rest mass
+_energy = std::max(_mass, _energy - energyLoss[i]);
 
-    // Propagate to target plane
-    double len = TrProp::Propagate(z_target);
-    if (len < 0)
-        return -1;
-
-    // Update kinematics with energy loss
-    // UpdateWithEnergyLoss(start_point, direction, z_target);
-
-    return GetBeta();
+// Update momentum and rigidity
+_momentum = sqrt(_energy * _energy - _mass * _mass);
+_rigidity = _momentum / _chrg;
 }
 
 bool ParticlePropagator::PropagateToTOF(double hitX[4], double hitY[4],
                                         double hitTime[4], double pathLength[4])
 {
     double total_length = 0;
-    const int steps_per_layer = 10; // Number of sub-steps between TOF layers
+    double total_time = 0;
 
+    // Propagate directly to each TOF layer
     for (int i = 0; i < 4; ++i)
     {
-        double z_start = _p0z;
         double z_target = tof_z[i];
-        double dz = (z_target - z_start) / steps_per_layer;
-        double layer_length = 0;
-        double layer_time = 0;
-        double current_z_target = z_start;
 
-        // Propagate in small steps
-        for (int step = 0; step < steps_per_layer; ++step)
-        {
-            double current_beta = GetBeta();
-            if (current_beta <= 0)
-                return false;
+        // Calculate beta before propagation
+        double current_beta = GetBeta();
+        if (current_beta <= 0)
+            return false;
 
-            AMSPoint start_point = GetP0();
-            AMSDir start_dir = GetDir();
+        // Store starting position for energy loss calculation
+        AMSPoint start_point = GetP0();
+        AMSDir start_dir = GetDir();
 
-            current_z_target += dz;
-
-            double len = TrProp::Propagate(current_z_target);
-            if (len < 0)
-                return false;
-
-            layer_length += len;
-            layer_time += len / (current_beta * SPEED_OF_LIGHT);
-
-            // Update energy loss after each step
-            // UpdateWithEnergyLoss(start_point, start_dir, current_z_target);
-        }
+        // Propagate to the TOF layer
+        double layer_length = TrProp::Propagate(z_target);
+        if (layer_length < 0)
+            return false;
 
         // Store hit position and direction for this layer
         _hitPoints[i] = GetP0();
@@ -132,10 +115,17 @@ bool ParticlePropagator::PropagateToTOF(double hitX[4], double hitY[4],
         hitX[i] = _hitPoints[i].x();
         hitY[i] = _hitPoints[i].y();
 
-        // Calculate path length and time
+        // Calculate time to reach this layer
+        double layer_time = layer_length / (current_beta * SPEED_OF_LIGHT);
+
+        // Update cumulative path length and time
         total_length += layer_length;
+        total_time += layer_time;
+
         pathLength[i] = total_length;
-        hitTime[i] = (i ? hitTime[i - 1] : 0) + layer_time;
+        hitTime[i] = total_time;
+
+        UpdateWithEnergyLoss(i);
     }
 
     return true;
