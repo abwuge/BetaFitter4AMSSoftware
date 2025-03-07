@@ -126,11 +126,13 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
             data.TRACKER_hitError[j] = 6.3e-4;
         }
 
-        data.charge = std::abs(tk_q[1]);
-        data.charge = (data.charge < 2.5 ? data.charge : tk_qin[0][2]);
+        data.charge = (tk_qin[0][2] < 2.5 ? tk_q[1] : tk_qin[0][2]);
         data.mass = 2 * data.charge * 0.9314941; // Suppose its' number of neutron equals to number of proton
         data.betaLinear = tof_betah;
         data.momentum = data.mass * data.betaLinear / sqrt(1 - data.betaLinear * data.betaLinear);
+
+        if (data.charge < 6)
+            continue;
 
         particles.push_back(data);
     }
