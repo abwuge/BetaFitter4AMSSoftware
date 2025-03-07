@@ -131,6 +131,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
         data.betaLinear = tof_betah;
         data.momentum = data.mass * data.betaLinear / sqrt(1 - data.betaLinear * data.betaLinear);
 
+        // TODO: This is a temporary method for filtering out fragmental particles
         if (data.charge < 6)
             continue;
 
@@ -139,98 +140,4 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
 
     file->Close();
     return particles;
-}
-
-bool Util::drawTrajectory(const ParticleData &particle, const std::string &outputPath, int nPoints)
-{
-#if false
-    try
-    {
-        // Create canvas and 3D view
-        TCanvas *c = new TCanvas("c", "Particle Trajectory", 800, 600);
-        c->SetFillColor(kWhite);
-
-        // Create 3D view
-        TView *view = TView::CreateView(1);
-        view->SetRange(-50, -50, -66, 50, 50, 66);
-        view->ShowAxis();
-
-        // Create TOF hit points
-        TPolyMarker3D *tofHits = new TPolyMarker3D(4);
-        for (int i = 0; i < 4; ++i)
-        {
-            tofHits->SetPoint(i, particle.hitX[i], particle.hitY[i], particle.hitZ[i]);
-        }
-        tofHits->SetMarkerStyle(20);
-        tofHits->SetMarkerColor(kRed);
-        tofHits->SetMarkerSize(1.2);
-        tofHits->Draw();
-
-        // Use MC truth position and direction if available
-        AMSPoint initPos;
-        AMSDir initDir;
-
-        if (particle.isMC)
-        {
-            // Use MC truth position and direction
-            initPos = AMSPoint(particle.mcCoo[0], particle.mcCoo[1], particle.mcCoo[2]);
-            // initPos = AMSPoint(particle.hitX[0], particle.hitY[0], particle.hitZ[0]);
-            initDir = AMSDir(particle.mcDir[0], particle.mcDir[1], particle.mcDir[2]);
-            // initDir = AMSDir(particle.mcDir[0], particle.mcDir[1], particle.mcDir[2]);
-            initDir.SetTheta(particle.Theta);
-            initDir.SetPhi(particle.Phi); 
-        }
-        else
-        {
-            // Fallback to reconstructed values
-            initPos = AMSPoint(0, 0, 100); // Start from above top TOF
-            double px = particle.momentum * sin(particle.Theta) * cos(particle.Phi);
-            double py = particle.momentum * sin(particle.Theta) * sin(particle.Phi);
-            double pz = particle.momentum * cos(particle.Theta);
-            initDir = AMSDir(px, py, pz);
-        }
-
-        ParticlePropagator prop(initPos, initDir, particle.momentum,
-                                particle.mass, particle.charge);
-
-        // Create trajectory points
-        TPolyLine3D *track = new TPolyLine3D(nPoints);
-        double zStep = (ParticlePropagator::TOF_Z[3] - ParticlePropagator::TOF_Z[0]) / (nPoints - 1);
-
-        for (int i = 0; i < nPoints; ++i)
-        {
-            double z = ParticlePropagator::TOF_Z[0] + i * zStep;
-            double beta = prop.PropagateToZ(z);
-            if (beta < 0)
-                continue;
-
-            AMSPoint pos = prop.GetP0();
-            track->SetPoint(i, pos.x(), pos.y(), pos.z());
-        }
-
-        track->SetLineColor(kBlue);
-        track->SetLineWidth(2);
-        track->Draw();
-
-        // Add labels for TOF layers
-        for (int i = 0; i < 4; ++i)
-        {
-            TText *label = new TText(particle.hitX[i] + 10, particle.hitY[i] + 10,
-                                     Form("TOF %d", i));
-            label->SetTextSize(0.02);
-            label->Draw();
-        }
-
-        c->Update();
-        c->Print(outputPath.c_str(), "pdf");
-
-        delete c; // This will delete all drawn objects
-        return true;
-    }
-    catch (...)
-    {
-        return false;
-    }
-#endif
-    return false;
 }

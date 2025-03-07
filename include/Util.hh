@@ -17,17 +17,6 @@
 namespace Util
 {
     /**
-     * @brief Draw particle trajectory and TOF hits in 3D
-     *
-     * @param particle Particle data containing MC truth and TOF hits
-     * @param outputPath Path to save the output plot (PDF format)
-     * @param nPoints Number of points to plot on the trajectory (default: 100)
-     * @return true if drawing was successful
-     * @return false if drawing failed
-     */
-    bool drawTrajectory(const ParticleData &particle, const std::string &outputPath, int nPoints = 100);
-
-    /**
      * @brief Load particle data from amstreea in ROOT file
      *
      * @param inputFile Path to the ROOT file containing particle data
