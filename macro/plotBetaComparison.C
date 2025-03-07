@@ -42,34 +42,17 @@ void plotBetaComparison(const char *fileName = "test.root",
         return;
     }
 
-    // Use a more efficient approach to get beta range - default values
-    double mcBetaMin = 0.1;
-    double mcBetaMax = 1.0;
-    
-    // Get actual beta range from the tree using ROOT's statistical functions
-    if (tree->GetEntries() > 0) {
-        // Create a temporary histogram to get min/max efficiently
-        // This won't be displayed and will be deleted right after use
-        TH1D* tempHist = new TH1D("tempHist", "Temporary Histogram", 1000, 0, 0);
-        
-        // Fill the histogram with mcBeta values
-        tree->Draw("mcBeta>>tempHist", "", "goff");
-        
-        // Get min and max from histogram statistics
-        if (tempHist->GetEntries() > 0) {
-            // For safety, in case of outliers, we take a range that covers most data points
-            mcBetaMin = tempHist->GetXaxis()->GetXmin();
-            mcBetaMax = tempHist->GetXaxis()->GetXmax();
-            
-            // Add a small margin
-            double margin = (mcBetaMax - mcBetaMin) * 0.05;
-            mcBetaMin = TMath::Max(0.1, mcBetaMin - margin);  
-            mcBetaMax = TMath::Min(1.0, mcBetaMax + margin);
-        }
-        
-        // Clean up temporary histogram
-        delete tempHist;
+    if (tree->GetEntries() == 0)
+    {
+        std::cerr << "Error: Empty tree, no data to plot" << std::endl;
+        file->Close();
+        delete file;
+        return;
     }
+
+    // Use a more efficient approach to get beta range - default values
+    double mcBetaMin = tree->GetMinimum("mcBeta");
+    double mcBetaMax = tree->GetMaximum("mcBeta");
 
     // Define variables for reading from tree
     double mcBeta, linearBeta, nonlinearBeta;
@@ -86,6 +69,10 @@ void plotBetaComparison(const char *fileName = "test.root",
     double xMin = mcBetaMin, xMax = mcBetaMax; // Range for the beta values
 
     double yMinRes = -0.2, yMaxRes = 1.2;
+
+    // Create canvas
+    TCanvas *canvas = new TCanvas("canvas", "Beta Residuals Comparison", 800, 600);
+    canvas->Divide(1, 2);
 
     // Create histograms for the residuals plot (1/beta_rec - 1/beta_mc)
     TH2F *hNonlinearResVsMC = new TH2F("hNonlinearResVsMC",
@@ -110,13 +97,9 @@ void plotBetaComparison(const char *fileName = "test.root",
         hLinearResVsMC->Fill(mcBeta, linearRes);
     }
 
-    // // Set color palette for better visualization
+    // Set color palette for better visualization
     gStyle->SetPalette(1);
     gStyle->SetOptStat(0);
-
-    // Create canvas
-    TCanvas *canvas = new TCanvas("canvas", "Beta Residuals Comparison", 800, 600);
-    canvas->Divide(1, 2);
 
     // Arrays to store fit results
     const int nProfiles = nBinsX;
@@ -167,17 +150,17 @@ void plotBetaComparison(const char *fileName = "test.root",
 
         // Calculate bin range for projection with wider window
         int binWindow = 1; // Use ±1 bins for better statistics
-        int binLow = std::max(1, binIdx - binWindow);
-        int binHigh = std::min(nBinsX, binIdx + binWindow);
+        int binLow = TMath::Max(1, binIdx - binWindow);
+        int binHigh = TMath::Min(nBinsX, binIdx + binWindow);
 
         mcBetaValues[bin] = binCenter;
 
         // Process nonlinear beta residual distribution with explicit options
         TH1D *projNonlinear = hNonlinearResVsMC->ProjectionY(Form("projNL_%d", bin), binLow, binHigh, "e"); // 'e' option to keep errors
         Int_t projNLEntries = projNonlinear->GetEntries();
-        
+
         if (projNLEntries) // Only fit if we have enough statistics
-        {   
+        {
             // Add reasonable initial parameters for the fit
             projNonlinear->Fit("gaus", "QN", "", yMinRes, yMaxRes); // Add fit range
             TF1 *fitNL = projNonlinear->GetFunction("gaus");
@@ -186,7 +169,7 @@ void plotBetaComparison(const char *fileName = "test.root",
                 nonlinearMean[bin] = fitNL->GetParameter(1);
                 nonlinearError[bin] = fitNL->GetParameter(2);
             }
-            else 
+            else
             {
                 nonlinearMean[bin] = projNonlinear->GetMean(); // Use histogram mean if fit fails
                 nonlinearError[bin] = projNonlinear->GetRMS();
@@ -202,7 +185,7 @@ void plotBetaComparison(const char *fileName = "test.root",
         // Process linear beta residual distribution with same improvements
         TH1D *projLinear = hLinearResVsMC->ProjectionY(Form("projL_%d", bin), binLow, binHigh, "e");
         Int_t projLEntries = projLinear->GetEntries();
-        
+
         if (projLEntries)
         {
             projLinear->Fit("gaus", "QN", "", yMinRes, yMaxRes);
@@ -212,7 +195,7 @@ void plotBetaComparison(const char *fileName = "test.root",
                 linearMean[bin] = fitL->GetParameter(1);
                 linearError[bin] = fitL->GetParameter(2);
             }
-            else 
+            else
             {
                 linearMean[bin] = projLinear->GetMean();
                 linearError[bin] = projLinear->GetRMS();
@@ -257,13 +240,13 @@ void plotBetaComparison(const char *fileName = "test.root",
     delete hNonlinearResVsMC;
     delete hLinearResVsMC;
     delete canvas;
-    
+
     // Reset tree branches to avoid dangling pointers
     tree->ResetBranchAddresses();
-    
+
     // Close and delete the file after all references are gone
     file->Close();
     delete file;
-    
+
     std::cout << "Beta residuals comparison plot saved to: " << outputName << std::endl;
 }
