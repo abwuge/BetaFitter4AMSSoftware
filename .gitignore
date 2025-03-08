@@ -10,3 +10,7 @@ build/*
 
 # Ignore test files
 *test*
+
+# Ignore results & logs
+results/*
+logs/*

@@ -1,0 +1,11 @@
+universe   = vanilla
+executable = /nas01/home/hxwu/AMSSoft/betaFitter/run.csh
+arguments  = $(inputfile) /nas01/home/hxwu/AMSSoft/betaFitter/results/$(Cluster)_$(Process).root
+
+request_cpus    = 1
+
+output    = /nas01/home/hxwu/AMSSoft/betaFitter/logs/output_$(Cluster)_$(Process).out
+error     = /nas01/home/hxwu/AMSSoft/betaFitter/logs/error_$(Cluster)_$(Process).err
+log       = /nas01/home/hxwu/AMSSoft/betaFitter/logs/job_$(Cluster)_$(Process).log
+
+queue inputfile from input.list
