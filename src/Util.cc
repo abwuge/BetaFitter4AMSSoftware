@@ -106,11 +106,12 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
             data.mcDir[2] = mevdir1[0][2];
         }
 
+        float minTime = *std::min_element(tof_tl, tof_tl + 4);
         for (int j = 0; j < ParticleData::TOF_MAX_HITS; ++j)
         {
             // TODO: this position might not be correct
             data.TOF_hitZ[j] = tof_pos[j][2];
-            data.TOF_hitTime[j] = tof_tl[j];
+            data.TOF_hitTime[j] = tof_tl[j] == -1 ? -1 : tof_tl[j] - minTime;
             // TODO: SO FAR it's constant, but it might not be correct
             data.TOF_hitTimeError[j] = 0.1544809;
             data.TOF_hitEdep[j] = tof_edep[j] * 1e-3;

@@ -8,11 +8,12 @@
 #include "ParticlePropagator.hh"
 #include "ParticleData.hh"
 
-class BetaFitter {
+class BetaFitter
+{
 public:
     // TOF time resolution (ns)
     static constexpr double TOF_TIME_RESOLUTION[4] = {0.1, 0.1, 0.1, 0.1};
-    
+
     /**
      * Reconstruct beta using non-linear method
      * @param particle Input particle containing track information
@@ -21,24 +22,21 @@ public:
      * @param timeErrors Array of TOF time measurement errors
      * @return Reconstructed 1/beta value
      */
-    static double reconstructBeta(const ParticleData* particle,
-                                ParticlePropagator& propagator,
-                                const double measuredTimesOri[4],
-                                const double timeErrors[4]);
+    static double reconstructBeta(const ParticleData *particle,
+                                  ParticlePropagator &propagator);
 
 private:
     /**
      * Calculate chi-square for a given 1/beta value
      * @param invBeta 1/beta value to test
-     * @param propagator Particle propagator 
+     * @param propagator Particle propagator
      * @param measuredTimes Measured TOF hit times
-     * @param timeErrors TOF time measurement errors 
+     * @param timeErrors TOF time measurement errors
      * @return Chi-square value
      */
-    static double calculateChi2(const double* invBeta,
-                              ParticlePropagator& propagator,
-                              const double measuredTimes[4],  
-                              const double timeErrors[4]);
+    static double calculateChi2(const double *invBeta,
+                                ParticlePropagator &propagator,
+                                const ParticleData &data);
 };
 
 #endif

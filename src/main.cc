@@ -73,7 +73,7 @@ int main(int argc, char **argv)
         // Get beta values
         mcBeta = particle.mcBeta;
         linearBeta = particle.betaLinear;
-        nonlinearBeta = 1 / BetaFitter::reconstructBeta(&particle, propagator, measuredTimes, timeErrors);
+        nonlinearBeta = 1 / BetaFitter::reconstructBeta(&particle, propagator);
 
         // Skip invalid reconstructions
         if (nonlinearBeta <= 0 || linearBeta <= 0)

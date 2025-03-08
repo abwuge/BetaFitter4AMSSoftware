@@ -21,6 +21,7 @@ private:
     double _energy;   // Energy of the particle
 
     float tof_z[ParticleData::TOF_MAX_HITS]{};
+    float tracker_z[ParticleData::TRACKER_MAX_HITS]{};
     float energyLoss[ParticleData::TOF_MAX_HITS]{};
 
     /**
@@ -54,14 +55,14 @@ public:
 
     /**
      * Propagate particle through all TOF layers
-     * @param hitX Array to store x coordinates at each TOF layer [output]
-     * @param hitY Array to store y coordinates at each TOF layer [output]
-     * @param hitTime Array to store hit times at each TOF layer [output]
-     * @param pathLength Array to store cumulative path lengths to each TOF layer [output]
+     * @param trackerHitX Array to store x coordinates at each TOF layer [output]
+     * @param trackerHitY Array to store y coordinates at each TOF layer [output]
+     * @param TOFHitTime Array to store hit times at each TOF layer [output]
      * @return true if propagation successful through all layers
      */
-    bool PropagateToTOF(double hitX[4], double hitY[4],
-                        double hitTime[4], double pathLength[4]);
+    bool PropagateToTOF(double trackerHitX[ParticleData::TRACKER_MAX_HITS],
+                        double trackerHitY[ParticleData::TRACKER_MAX_HITS],
+                        double TOFHitTime[ParticleData::TOF_MAX_HITS]);
 
     /**
      * Get particle's current beta (v/c)

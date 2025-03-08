@@ -37,6 +37,9 @@ ParticlePropagator::ParticlePropagator(const ParticleData &data)
         tof_z[i] = data.TOF_hitZ[i];
         energyLoss[i] = data.TOF_hitEdep[i];
     }
+
+    for (int i = 0; i < 9; ++i)
+        tracker_z[i] = data.TRACKER_hitZ[i];
 }
 
 double ParticlePropagator::GetBeta() const
@@ -59,42 +62,49 @@ void ParticlePropagator::UpdateWithEnergyLoss(int i)
     _rigidity = _momentum / _chrg;
 }
 
-bool ParticlePropagator::PropagateToTOF(double hitX[4], double hitY[4],
-                                        double hitTime[4], double pathLength[4])
+bool ParticlePropagator::PropagateToTOF(double trackerHitX[ParticleData::TRACKER_MAX_HITS],
+                                        double trackerHitY[ParticleData::TRACKER_MAX_HITS],
+                                        double TOFHitTime[ParticleData::TOF_MAX_HITS])
 {
-    double total_length = 0;
     double total_time = 0;
+    int i = 0, j = 1; // i for TOF, j for tracker
 
-    // Propagate directly to each TOF layer
-    for (int i = 0; i < 4; ++i)
+    // Propagate according to z position (descending order)
+    while (i < ParticleData::TOF_MAX_HITS || j < ParticleData::TRACKER_MAX_HITS)
     {
-        double z_target = tof_z[i];
+        // Get next target z position
+        double tof_next = (i < ParticleData::TOF_MAX_HITS) ? tof_z[i] : -999999;
+        double tracker_next = (j < ParticleData::TRACKER_MAX_HITS) ? tracker_z[j] : -999999;
 
-        // Calculate beta before propagation
-        double current_beta = GetBeta();
-        if (current_beta <= 0)
-            return false;
+        // Check if we're done
+        if (tof_next < -99999 && tracker_next < -99999)
+            break;
 
-        // Propagate to the TOF layer
+        // Determine which layer to propagate to
+        bool is_tof = tof_next > tracker_next;
+        double z_target = is_tof ? tof_next : tracker_next;
+
+        // Propagate to the layer
         double layer_length = TrProp::Propagate(z_target);
         if (layer_length < 0)
             return false;
 
-        // Record hit coordinates
-        hitX[i] = _p0x;
-        hitY[i] = _p0y;
-
-        // Calculate time to reach this layer
-        double layer_time = layer_length / (current_beta * SPEED_OF_LIGHT);
-
-        // Update cumulative path length and time
-        total_length += layer_length;
+        // Update for TOF or Tracker
+        double layer_time = layer_length / (GetBeta() * SPEED_OF_LIGHT);
         total_time += layer_time;
-
-        pathLength[i] = total_length;
-        hitTime[i] = total_time;
-
-        UpdateWithEnergyLoss(i);
+        
+        if (is_tof)
+        {
+            TOFHitTime[i] = total_time;
+            UpdateWithEnergyLoss(i);
+            i++;
+        }
+        else
+        {
+            trackerHitX[j] = _p0x;
+            trackerHitY[j] = _p0y;
+            j++;
+        }
     }
 
     return true;
