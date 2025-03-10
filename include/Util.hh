@@ -33,6 +33,14 @@ namespace Util
      * @return std::vector<ParticleData> Vector of particle data, empty if loading fails
      */
     std::vector<ParticleData> loadParticleData(const std::string &inputFile);
+
+    /**
+     * @brief Save magnetic field information to ROOT file
+     * 
+     * @param outputFile Path to save the ROOT file containing magnetic field data
+     * @return bool True if saving succeeds, false otherwise
+     */
+    bool saveMagneticField(const std::string &outputFile);
 }
 
 #endif // __UTIL_HH__

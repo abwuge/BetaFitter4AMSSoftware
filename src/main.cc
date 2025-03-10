@@ -15,6 +15,11 @@ int main(int argc, char **argv)
     if (argc < 3)
     {
         std::cout << "Usage: " << argv[0] << " <inputFile.root> <outputFile.root> [<fitOption>]" << std::endl;
+        std::cout << "fitOption: " << std::endl;
+        std::cout << "  -1: Save magnetic field information to ROOT file" << std::endl;
+        std::cout << "   0: Only TOF hits" << std::endl;
+        std::cout << "   1: TOF hits + Tracker hits" << std::endl;
+        std::cout << "   2: TOF hits + Tracker hits + Energy loss scale" << std::endl;
         return 1;
     }
 
@@ -23,11 +28,19 @@ int main(int argc, char **argv)
 
     /**
      * Fit option:
-     * 0: Only TOF hits
-     * 1: TOF hits + Tracker hits
-     * 2: TOF hits + Tracker hits + Energy loss scale
+     * -1: Save magnetic field information
+     *  0: Only TOF hits
+     *  1: TOF hits + Tracker hits
+     *  2: TOF hits + Tracker hits + Energy loss scale
      */
     BetaFitter::fitOption = argc > 3 ? atoi(argv[3]) : 0;
+
+    // Handle magnetic field information saving
+    if (BetaFitter::fitOption == -1) {
+        return Util::saveMagneticField(outputFile) ? 0 : 1;
+    }
+
+    // Normal beta reconstruction workflow
     if (BetaFitter::fitOption < 0 || BetaFitter::fitOption > 2)
         BetaFitter::fitOption = 0;
 

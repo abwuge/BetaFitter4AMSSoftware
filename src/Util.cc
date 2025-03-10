@@ -145,3 +145,66 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     file->Close();
     return particles;
 }
+
+bool Util::saveMagneticField(const std::string &outputFile) {
+    // Create output ROOT file
+    TFile* outFile = new TFile(outputFile.c_str(), "RECREATE");
+    if (!outFile || outFile->IsZombie()) {
+        std::cerr << "Error: Could not create output file " << outputFile << std::endl;
+        return false;
+    }
+
+    // Define the dimensions and ranges for magnetic field sampling
+    const int nx = 50, ny = 50, nz = 50;
+    const double xmin = -100, xmax = 100;  // cm
+    const double ymin = -100, ymax = 100;  // cm
+    const double zmin = -150, zmax = 150;  // cm
+
+    // Create TTree to store magnetic field data
+    TTree* magTree = new TTree("magfield", "Magnetic Field Data");
+    double x, y, z;
+    double bx, by, bz;
+    double b_magnitude;
+
+    // Set up branches
+    magTree->Branch("x", &x, "x/D");
+    magTree->Branch("y", &y, "y/D");
+    magTree->Branch("z", &z, "z/D");
+    magTree->Branch("bx", &bx, "bx/D");
+    magTree->Branch("by", &by, "by/D");
+    magTree->Branch("bz", &bz, "bz/D");
+    magTree->Branch("b_magnitude", &b_magnitude, "b_magnitude/D");
+
+    // Sample magnetic field at grid points
+    double dx = (xmax - xmin) / (nx - 1);
+    double dy = (ymax - ymin) / (ny - 1);
+    double dz = (zmax - zmin) / (nz - 1);
+    double bf[3];
+
+    for (int ix = 0; ix < nx; ix++) {
+        x = xmin + ix * dx;
+        for (int iy = 0; iy < ny; iy++) {
+            y = ymin + iy * dy;
+            for (int iz = 0; iz < nz; iz++) {
+                z = zmin + iz * dz;
+
+                // Get magnetic field at this point using AMS software
+                TrFit::GuFld(x, y, z, bf);
+                
+                bx = bf[0];
+                by = bf[1];
+                bz = bf[2];
+                b_magnitude = sqrt(bx*bx + by*by + bz*bz);
+
+                magTree->Fill();
+            }
+        }
+    }
+
+    // Write and close
+    magTree->Write();
+    outFile->Close();
+    delete outFile;
+
+    return true;
+}
