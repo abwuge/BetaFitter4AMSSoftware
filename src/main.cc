@@ -14,12 +14,22 @@ int main(int argc, char **argv)
 {
     if (argc < 3)
     {
-        std::cout << "Usage: " << argv[0] << " <inputFile.root> <outputFile.root>" << std::endl;
+        std::cout << "Usage: " << argv[0] << " <inputFile.root> <outputFile.root> [<fitOption>]" << std::endl;
         return 1;
     }
 
     std::string inputFile = argv[1];
     std::string outputFile = argv[2];
+
+    /**
+     * Fit option:
+     * 0: Only TOF hits
+     * 1: TOF hits + Tracker hits
+     * 2: TOF hits + Tracker hits + Energy loss scale
+     */
+    BetaFitter::fitOption = argc > 3 ? atoi(argv[3]) : 0;
+    if (BetaFitter::fitOption < 0 || BetaFitter::fitOption > 2)
+        BetaFitter::fitOption = 0;
 
     // Load particle data from input file
     std::vector<ParticleData> particles = Util::loadParticleData(inputFile);

@@ -7,7 +7,7 @@ ParticlePropagator::ParticlePropagator(const AMSPoint &pos,
                                        double momentum,
                                        double mass,
                                        double charge)
-    : TrProp(pos, dir), _initPos(pos), _initDir(dir)
+    : TrProp(pos, dir), _initPos(pos), _initDir(dir), _energyLossScale(1.0)
 {
     if (charge == 0)
     {
@@ -55,7 +55,7 @@ double ParticlePropagator::GetMomentum() const
 void ParticlePropagator::UpdateWithEnergyLoss(int i)
 {
     // Update energy ensuring it stays above rest mass
-    _energy = std::max(_mass, _energy - energyLoss[i]);
+    _energy = std::max(_mass, _energy - energyLoss[i] * _energyLossScale);
 
     // Update momentum and rigidity
     _momentum = sqrt(_energy * _energy - _mass * _mass);

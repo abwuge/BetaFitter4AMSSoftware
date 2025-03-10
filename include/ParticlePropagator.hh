@@ -24,6 +24,8 @@ private:
     float tracker_z[ParticleData::TRACKER_MAX_HITS]{};
     float energyLoss[ParticleData::TOF_MAX_HITS]{};
 
+    double _energyLossScale;  // Energy loss scale factor
+
     /**
      * Initialize particle propagator with given parameters
      * @param pos Initial position of the particle
@@ -81,6 +83,9 @@ public:
      * @return Momentum in GeV/c
      */
     double GetMomentum() const;
+
+    void SetEnergyLossScale(double scale) { _energyLossScale = scale; }
+    double GetEnergyLossScale() const { return _energyLossScale; }
 
 private:
     /**

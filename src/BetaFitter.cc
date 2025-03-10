@@ -2,20 +2,28 @@
 #include <algorithm>
 #include <TMath.h>
 
-double BetaFitter::calculateChi2(const double *invBeta,
+int BetaFitter::fitOption = 0;
+
+double BetaFitter::calculateChi2(const double *params,
                                  ParticlePropagator &propagator,
                                  const ParticleData &data)
 {
     // Set particle beta for propagation
-    double beta = 1.0 / invBeta[0];
-    propagator.resetPropagator(beta); // TODO: This always returns true, so we can ignore the return value
+    double beta = 1.0 / params[0];
+    propagator.resetPropagator(beta);
+
+    // Set energy loss scale if fitOption == 2
+    if (fitOption == 2)
+    {
+        propagator.SetEnergyLossScale(params[1]);
+    }
 
     // Calculate TOF hits and path lengths
     double trackerHitX[ParticleData::TRACKER_MAX_HITS];
     double trackerHitY[ParticleData::TRACKER_MAX_HITS];
     double TOFHitTime[ParticleData::TOF_MAX_HITS];
     if (!propagator.PropagateToTOF(trackerHitX, trackerHitY, TOFHitTime))
-        return 1e10 * invBeta[0];
+        return 1e10 * params[0];
 
     double minTime = *std::min_element(TOFHitTime, TOFHitTime + 4);
     for (int i = 0; i < 4; ++i)
@@ -32,18 +40,21 @@ double BetaFitter::calculateChi2(const double *invBeta,
         chi2 += (dt * dt) / (sigma * sigma);
     }
 
-    // i = 1 to skip the first hit (which is used for propagation)
-    for (int i = 1; i < ParticleData::TRACKER_MAX_HITS; ++i)
+    if (fitOption > 0)
     {
-        double sigma = data.TRACKER_hitError[i];
+        // i = 1 to skip the first hit (which is used for propagation)
+        for (int i = 1; i < ParticleData::TRACKER_MAX_HITS; ++i)
+        {
+            double sigma = data.TRACKER_hitError[i];
 
-        double dx = trackerHitX[i] - data.TRACKER_hitX[i];
-        double dy = trackerHitY[i] - data.TRACKER_hitY[i];
+            double dx = trackerHitX[i] - data.TRACKER_hitX[i];
+            double dy = trackerHitY[i] - data.TRACKER_hitY[i];
 
-        chi2 += (dx * dx + dy * dy) / (sigma * sigma);
+            chi2 += (dx * dx + dy * dy) / (sigma * sigma);
+        }
     }
 
-    return std::isinf(chi2) ? 1e10 * invBeta[0] : chi2;
+    return std::isinf(chi2) ? 1e10 * params[0] : chi2;
 }
 
 double BetaFitter::reconstructBeta(const ParticleData *particle,
@@ -60,18 +71,27 @@ double BetaFitter::reconstructBeta(const ParticleData *particle,
     {
         return calculateChi2(params, propagator, *particle);
     };
-    ROOT::Math::Functor functor(chi2Function, 1);
+
+    // Set number of parameters based on fitOption
+    int nParams = (fitOption == 2) ? 2 : 1;
+    ROOT::Math::Functor functor(chi2Function, nParams);
     minimizer->SetFunction(functor);
 
-    // Set parameter limits and initial value
+    // Set parameter limits and initial values
     double lowerLimit = 1.0 + 1e-4;  // beta < 1
     double upperLimit = 10.0 - 1e-4; // beta > 0.1
     initialBetaRecip = TMath::Range(lowerLimit, upperLimit, initialBetaRecip);
     minimizer->SetLimitedVariable(0, "betaReciprocal", initialBetaRecip, 1e-5, lowerLimit, upperLimit);
 
+    if (fitOption == 2)
+        minimizer->SetLimitedVariable(1, "energyLossScale", 1.0, 1e-3, 1, 3);
+
     // Do minimization
     minimizer->Minimize();
     double betaReciprocal = minimizer->X()[0];
+
+    if (fitOption == 2 && betaReciprocal - 1. / particle->mcBeta > 0.2)
+        printf("scale: %f\n", minimizer->X()[1]);
 
     delete minimizer;
     return betaReciprocal;

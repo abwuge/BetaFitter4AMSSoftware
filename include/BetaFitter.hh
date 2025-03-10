@@ -13,13 +13,12 @@ class BetaFitter
 public:
     // TOF time resolution (ns)
     static constexpr double TOF_TIME_RESOLUTION[4] = {0.1, 0.1, 0.1, 0.1};
+    static int fitOption;
 
     /**
      * Reconstruct beta using non-linear method
      * @param particle Input particle containing track information
      * @param propagator Particle propagator for track extrapolation
-     * @param measuredTimes Array of measured TOF hit times
-     * @param timeErrors Array of TOF time measurement errors
      * @return Reconstructed 1/beta value
      */
     static double reconstructBeta(const ParticleData *particle,
