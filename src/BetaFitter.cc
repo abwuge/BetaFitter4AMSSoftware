@@ -19,9 +19,9 @@ double BetaFitter::calculateChi2(const double *params,
     }
 
     // Calculate TOF hits and path lengths
-    double trackerHitX[ParticleData::TRACKER_MAX_HITS];
-    double trackerHitY[ParticleData::TRACKER_MAX_HITS];
-    double TOFHitTime[ParticleData::TOF_MAX_HITS];
+    double trackerHitX[ParticleData::TRACKER_MAX_HITS]{};
+    double trackerHitY[ParticleData::TRACKER_MAX_HITS]{};
+    double TOFHitTime[ParticleData::TOF_MAX_HITS]{};
     if (!propagator.PropagateToTOF(trackerHitX, trackerHitY, TOFHitTime))
         return 1e10 * params[0];
 
@@ -42,8 +42,8 @@ double BetaFitter::calculateChi2(const double *params,
 
     if (fitOption > 0)
     {
-        // i = 1 to skip the first hit (which is used for propagation)
-        for (int i = 1; i < ParticleData::TRACKER_MAX_HITS; ++i)
+        // Only consider tracker hits inside the TOF region
+        for (int i = 1; i < ParticleData::TRACKER_MAX_HITS - 1; ++i)
         {
             double sigma = data.TRACKER_hitError[i];
 

@@ -25,11 +25,11 @@ ParticlePropagator::ParticlePropagator(const AMSPoint &pos,
 }
 
 ParticlePropagator::ParticlePropagator(const ParticleData &data)
-    // : ParticlePropagator(AMSPoint(data.mcCoo[0], data.mcCoo[1], data.mcCoo[2]),
-    //                      AMSDir(data.mcDir[0], data.mcDir[1], data.mcDir[2]),
+    // : ParticlePropagator(AMSPoint(data.mcInitCoo[0], data.mcInitCoo[1], data.mcInitCoo[2]),
+    //                      AMSDir(data.mcInitDir[0], data.mcInitDir[1], data.mcInitDir[2]),
     //                      data.mcMomentum, data.mcMass, data.mcCharge)
-    : ParticlePropagator(AMSPoint(data.TRACKER_hitX[0], data.TRACKER_hitY[0], data.TRACKER_hitZ[0]),
-                         AMSDir(data.TRACKER_dir[0], data.TRACKER_dir[1], data.TRACKER_dir[2]),
+    : ParticlePropagator(AMSPoint(data.initCoo[0], data.initCoo[1], data.initCoo[2]),
+                         AMSDir(data.initDir[0], data.initDir[1], data.initDir[2]),
                          data.momentum, data.mass, data.charge)
 {
     for (int i = 0; i < 4; ++i)
@@ -67,18 +67,15 @@ bool ParticlePropagator::PropagateToTOF(double trackerHitX[ParticleData::TRACKER
                                         double TOFHitTime[ParticleData::TOF_MAX_HITS])
 {
     double total_time = 0;
-    int i = 0, j = 1; // i for TOF, j for tracker
+    int i = 1, j = 1; // i for TOF, j for tracker
+    int iMax = ParticleData::TOF_MAX_HITS, jMax = ParticleData::TRACKER_MAX_HITS - 1;
 
-    // Propagate according to z position (descending order)
-    while (i < ParticleData::TOF_MAX_HITS || j < ParticleData::TRACKER_MAX_HITS)
+    // Propagate according to z position
+    while (i < iMax || j < jMax)
     {
         // Get next target z position
-        double tof_next = (i < ParticleData::TOF_MAX_HITS) ? tof_z[i] : -999999;
-        double tracker_next = (j < ParticleData::TRACKER_MAX_HITS) ? tracker_z[j] : -999999;
-
-        // Check if we're done
-        if (tof_next < -99999 && tracker_next < -99999)
-            break;
+        double tof_next = (i < iMax) ? tof_z[i] : -999999;
+        double tracker_next = (j < jMax) ? tracker_z[j] : -999999;
 
         // Determine which layer to propagate to
         bool is_tof = tof_next > tracker_next;

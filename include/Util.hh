@@ -24,7 +24,7 @@ namespace Util
      * @param pdgId Geant3 particle ID or Geant4 PDG ID
      * @return float Mass in GeV/c^2, 0 if particle not recognized
      */
-    float getMassFromPDG(int pdgId, double charge);
+    float getMass(int pdgId, double charge);
 
     /**
      * @brief Load particle data from amstreea in ROOT file

@@ -11,8 +11,8 @@
 #include <TText.h>
 #include "TDatabasePDG.h"
 
-// Implementation of getMassFromPDG function
-float Util::getMassFromPDG(int pdgId, double charge)
+// Implementation of getMass function
+float Util::getMass(int pdgId, double charge)
 {
     switch (pdgId)
     {
@@ -47,16 +47,16 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     // Variables to read from tree
     bool isMC = false;
     int mpar = 0;
-    float mmom = 0.0f, mch = 0.0f, mmass = 0.0f;
+    float mch = 0.0f;
     float mevcoo1[21][3] = {0};
     float mevdir1[21][3] = {0};
     float mevmom1[21] = {0};
     float tof_betah = 0.0f;
     float tof_tl[4] = {0};
     float tof_pos[4][3] = {0};
+    float tof_dir[4][3] = {0};
     float tof_edep[4] = {0};
     float tk_pos[9][3] = {0};
-    float tk_dir[9][3] = {0};
     float tk_q[2] = {0};
     float tk_qin[2][3] = {0};
 
@@ -65,7 +65,6 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     {
         isMC = true;
         tree->SetBranchAddress("mpar", &mpar);
-        tree->SetBranchAddress("mmom", &mmom);
         tree->SetBranchAddress("mch", &mch);
         tree->SetBranchAddress("mevcoo1", mevcoo1);
         tree->SetBranchAddress("mevdir1", mevdir1);
@@ -74,9 +73,9 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     tree->SetBranchAddress("tof_betah", &tof_betah);
     tree->SetBranchAddress("tof_tl", tof_tl);
     tree->SetBranchAddress("tof_pos", tof_pos);
+    tree->SetBranchAddress("tof_dir", tof_dir);
     tree->SetBranchAddress("tof_edep", tof_edep);
     tree->SetBranchAddress("tk_pos", tk_pos);
-    tree->SetBranchAddress("tk_dir", tk_dir);
     tree->SetBranchAddress("tk_q", tk_q);
     tree->SetBranchAddress("tk_qin", tk_qin);
 
@@ -90,21 +89,32 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
         if (isMC)
         {
             data.isMC = true;
-            data.mcPdgId = mpar;
+            data.mcGeantId = mpar;
             data.mcCharge = mch;
-            data.mcMomentum = mmom;
-            mmass = getMassFromPDG(mpar, mch);
+            float mmass = getMass(mpar, mch);
             data.mcMass = mmass;
+
+            // Index 4 --> z = 65.95 cm --> utof(65.2 cm)
+            data.mcInitCoo[0] = mevcoo1[4][0];
+            data.mcInitCoo[1] = mevcoo1[4][1];
+            data.mcInitCoo[2] = mevcoo1[4][2];
+
+            data.mcInitDir[0] = mevdir1[4][0];
+            data.mcInitDir[1] = mevdir1[4][1];
+            data.mcInitDir[2] = mevdir1[4][2];
+
+            float mmom = mevmom1[4];
+            data.mcMomentum = mmom;
             data.mcBeta = mmom / sqrt(mmom * mmom + mmass * mmass);
-
-            data.mcCoo[0] = mevcoo1[0][0];
-            data.mcCoo[1] = mevcoo1[0][1];
-            data.mcCoo[2] = mevcoo1[0][2];
-
-            data.mcDir[0] = mevdir1[0][0];
-            data.mcDir[1] = mevdir1[0][1];
-            data.mcDir[2] = mevdir1[0][2];
         }
+
+        data.initCoo[0] = tof_pos[0][0];
+        data.initCoo[1] = tof_pos[0][1];
+        data.initCoo[2] = tof_pos[0][2];
+
+        data.initDir[0] = tof_dir[0][0];
+        data.initDir[1] = tof_dir[0][1];
+        data.initDir[2] = tof_dir[0][2];
 
         float minTime = *std::min_element(tof_tl, tof_tl + 4);
         for (int j = 0; j < ParticleData::TOF_MAX_HITS; ++j)
@@ -116,10 +126,6 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
             data.TOF_hitTimeError[j] = 0.1544809;
             data.TOF_hitEdep[j] = tof_edep[j] * 1e-3;
         }
-
-        data.TRACKER_dir[0] = tk_dir[0][0];
-        data.TRACKER_dir[1] = tk_dir[0][1];
-        data.TRACKER_dir[2] = tk_dir[0][2];
 
         for (int j = 0; j < ParticleData::TRACKER_MAX_HITS; ++j)
         {
