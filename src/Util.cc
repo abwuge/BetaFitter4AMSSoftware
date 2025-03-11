@@ -130,7 +130,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
             data.TRACKER_hitError[j] = 6.3e-4;
         }
 
-        data.charge = (int) ((tk_qin[0][2] < 2.5 ? tk_q[1] : tk_qin[0][2]) + 0.5);
+        data.charge = (int)((tk_qin[0][2] < 2.5 ? tk_q[1] : tk_qin[0][2]) + 0.5);
         data.mass = 2 * data.charge * 0.9314941; // Suppose its' number of neutron equals to number of proton
         data.betaLinear = tof_betah;
         data.momentum = data.mass * data.betaLinear / sqrt(1 - data.betaLinear * data.betaLinear);
@@ -146,22 +146,26 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     return particles;
 }
 
-bool Util::saveMagneticField(const std::string &outputFile) {
+bool Util::saveMagneticField(const std::string &outputFile)
+{
     // Create output ROOT file
-    TFile* outFile = new TFile(outputFile.c_str(), "RECREATE");
-    if (!outFile || outFile->IsZombie()) {
+    TFile *outFile = new TFile(outputFile.c_str(), "RECREATE");
+    if (!outFile || outFile->IsZombie())
+    {
         std::cerr << "Error: Could not create output file " << outputFile << std::endl;
         return false;
     }
 
     // Define the dimensions and ranges for magnetic field sampling
-    const int nx = 50, ny = 50, nz = 50;
-    const double xmin = -100, xmax = 100;  // cm
-    const double ymin = -100, ymax = 100;  // cm
-    const double zmin = -150, zmax = 150;  // cm
+    const int nx = 101;
+    const int ny = 101;
+    const int nz = 101;
+    const double xmin = -100, xmax = 100; // cm
+    const double ymin = -100, ymax = 100; // cm
+    const double zmin = -100, zmax = 100; // cm
 
     // Create TTree to store magnetic field data
-    TTree* magTree = new TTree("magfield", "Magnetic Field Data");
+    TTree *magTree = new TTree("magfield", "Magnetic Field Data");
     double x, y, z;
     double bx, by, bz;
     double b_magnitude;
@@ -181,20 +185,23 @@ bool Util::saveMagneticField(const std::string &outputFile) {
     double dz = (zmax - zmin) / (nz - 1);
     double bf[3];
 
-    for (int ix = 0; ix < nx; ix++) {
+    for (int ix = 0; ix < nx; ix++)
+    {
         x = xmin + ix * dx;
-        for (int iy = 0; iy < ny; iy++) {
+        for (int iy = 0; iy < ny; iy++)
+        {
             y = ymin + iy * dy;
-            for (int iz = 0; iz < nz; iz++) {
+            for (int iz = 0; iz < nz; iz++)
+            {
                 z = zmin + iz * dz;
 
                 // Get magnetic field at this point using AMS software
                 TrFit::GuFld(x, y, z, bf);
-                
+
                 bx = bf[0];
                 by = bf[1];
                 bz = bf[2];
-                b_magnitude = sqrt(bx*bx + by*by + bz*bz);
+                b_magnitude = sqrt(bx * bx + by * by + bz * bz);
 
                 magTree->Fill();
             }
