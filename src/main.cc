@@ -77,21 +77,12 @@ int main(int argc, char **argv)
         // Skip invalid particles
         if (!particle.isMC)
             continue;
-        // if (particle.mass < 0)
-        //     continue;
-        if (particle.mcCoo[0] == -1000)
+
+        if (particle.mcInitCoo[0] == -1000)
             continue;
 
         // Setup particle propagator with initial state
         ParticlePropagator propagator(particle);
-
-        // Prepare arrays for beta reconstruction
-        double measuredTimes[4], timeErrors[4];
-        for (int i = 0; i < 4; ++i)
-        {
-            measuredTimes[i] = particle.TOF_hitTime[i];
-            timeErrors[i] = particle.TOF_hitTimeError[i];
-        }
 
         // Get beta values
         mcBeta = particle.mcBeta;
