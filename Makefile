@@ -167,7 +167,8 @@ $(EXE): $(OBJECTS) $(NTUPLE_LIB)
 	$(CXX) -o $@ $(OBJECTS) $(CXXFLAGS) $(DEFINES) -L$(NTUPLE_LIBDIR) -lntuple_slc6_PG$(LIB_SUFFIX) $(shell root-config --libs) -lMinuit -lTMVA -lNetx -lGeom -lMathMore -lEG -lTreePlayer -lMLP -lXMLIO $(LIBAUXS) $(CERNLIB)
 
 clean:
-	rm -rf $(BUILDDIR)
+	rm -f $(BUILDDIR)/obj/*
+	rm -f $(BUILDDIR)/bin/betaFitter*
 
 # Handle debug target
 debug: OPTFLAGS=-O0 -g
