@@ -108,8 +108,8 @@ void plotBetaComparison(const char *fileName = "test.root",
 
     // Print table header before the loop
     std::cout << std::endl;
-    std::cout << "Bin\tBeta\t\tProj_NL\t\tProj_L\t\tNL_mean\t\tL_mean" << std::endl;
-    std::cout << std::string(80, '-') << std::endl;
+    std::cout << "Bin\tBeta\t\tProj_NL\tProj_L\tNL_mean\t\tL_mean" << std::endl;
+    std::cout << std::string(65, '-') << std::endl;
 
     double binWidth = (xMax - xMin) / nBinsX;
     for (int bin = 0; bin < nBinsX; ++bin)
@@ -178,7 +178,7 @@ void plotBetaComparison(const char *fileName = "test.root",
         delete projLinear;
 
         // Print data in aligned columns using tabs
-        printf("%d\t%.6f\t%d\t\t%d\t\t%.6f\t%.6f\n",
+        printf("%d\t%.6f\t%d\t%d\t%.6f\t%.6f\n",
                bin, binCenter, projNLEntries, projLEntries,
                nonlinearMean[bin], linearMean[bin]);
     }
@@ -189,6 +189,8 @@ void plotBetaComparison(const char *fileName = "test.root",
 
     // First page - Non-linear beta residuals
     TCanvas *c1 = new TCanvas("c1", "Non-linear Beta Residuals", 3508, 2480);
+    c1->SetLeftMargin(0.16);
+    c1->SetRightMargin(0.11);
     c1->SetGridx();
     c1->SetGridy();
     c1->SetLogz();
@@ -212,6 +214,8 @@ void plotBetaComparison(const char *fileName = "test.root",
 
     // Second page - Linear beta residuals
     TCanvas *c2 = new TCanvas("c2", "Linear Beta Residuals", 3508, 2480);
+    c2->SetLeftMargin(0.16);
+    c2->SetRightMargin(0.11);
     c2->SetGridx();
     c2->SetGridy();
     c2->SetLogz();
@@ -235,6 +239,7 @@ void plotBetaComparison(const char *fileName = "test.root",
 
     // Third page - Comparison of TGraphErrors
     TCanvas *c3 = new TCanvas("c3", "Beta Reconstruction Methods Comparison", 3508, 2480);
+    c3->SetLeftMargin(0.16);
     c3->SetGridx();
     c3->SetGridy();
 
