@@ -250,3 +250,122 @@ bool Util::calculateTOFEnergyLoss(const ParticleData &particle, double beta, dou
 
     return false;
 }
+
+bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outputFile)
+{
+    TFile *fileIn = TFile::Open(inputFile.c_str(), "READ");
+    if (!fileIn || fileIn->IsZombie())
+    {
+        std::cerr << "Error: Could not open file " << inputFile << std::endl;
+        return false;
+    }
+
+    TTree *treeIn = (TTree *)fileIn->Get("amstreea");
+    if (!treeIn)
+    {
+        std::cerr << "Error: Could not find amstreea tree in " << inputFile << std::endl;
+        fileIn->Close();
+        return false;
+    }
+
+    if (!treeIn->GetBranch("mpar"))
+    {
+        std::cerr << "Error: Could not find Monte Carlo information in " << inputFile << std::endl;
+        fileIn->Close();
+        return false;
+    }
+
+    int mpar = 0;
+    float mch = 0.0f;
+    float mevmom1[21] = {0};
+    float tof_edep[4] = {0};
+
+    treeIn->SetBranchAddress("mpar", &mpar);
+    treeIn->SetBranchAddress("mch", &mch);
+    treeIn->SetBranchAddress("mevmom1", mevmom1);
+    treeIn->SetBranchAddress("tof_edep", tof_edep);
+
+    TFile *fileOut = new TFile(outputFile.c_str(), "RECREATE");
+    if (!fileOut || fileOut->IsZombie())
+    {
+        std::cerr << "Error: Could not create output file " << outputFile << std::endl;
+        return false;
+    }
+
+    TTree *treeOut = new TTree("energyLoss", "Energy Loss Information");
+
+    float mcBeta = 0.0;               // Monte Carlo beta
+    float energyDepositedS1S2 = 0.0;  // energy deposited from before S1 to after S2
+    float energyDepositedTotal = 0.0; // total energy deposited
+    float energyLoss_S1S2_ = 0.0;     // energy loss from before S1 to after S2
+    float energyLoss_S1S4_ = 0.0;     // energy loss from before S1 to after S4
+    float energyLossScaleS1S2 = 0.0;  // energy loss scale factor from before S1 to after S2
+    float energyLossScaleTotal = 0.0; // energy loss scale factor from before S1 to after S4
+    float energyLossS2__S3 = 0.0;     // energy loss from after S2 to before S3
+    float energyLossS2S3_Total = 0.0; // energy loss from after S2 to before S3, normalized to total energy loss
+
+    treeOut->Branch("energyDepositedS1S2", &energyDepositedS1S2, "energyDepositedS1S2/F");
+    treeOut->Branch("energyDepositedTotal", &energyDepositedTotal, "energyDepositedTotal/F");
+    treeOut->Branch("energyLoss_S1S2_", &energyLoss_S1S2_, "energyLoss_S1S2_/F");
+    treeOut->Branch("energyLoss_S1S4_", &energyLoss_S1S4_, "energyLoss_S1S4_/F");
+    treeOut->Branch("energyLossScaleS1S2", &energyLossScaleS1S2, "energyLossScaleS1S2/F");
+    treeOut->Branch("energyLossScaleTotal", &energyLossScaleTotal, "energyLossScaleTotal/F");
+    treeOut->Branch("energyLossS2__S3", &energyLossS2__S3, "energyLossS2__S3/F");
+    treeOut->Branch("energyLossS2S3_Total", &energyLossS2S3_Total, "energyLossS2S3_Total/F");
+    treeOut->Branch("mcBeta", &mcBeta, "mcBeta/F");
+
+    // Read all entries
+    Long64_t nEntries = treeIn->GetEntries();
+    for (Long64_t i = 0; i < nEntries; ++i)
+    {
+        treeIn->GetEntry(i);
+
+        if (mch != 8)
+            continue;
+
+        if (mevmom1[4] == -1000 || mevmom1[6] == -1000 || mevmom1[7] == -1000 || mevmom1[15] == -1000 || mevmom1[14] == -1000 || mevmom1[17] == -1000)
+            continue;
+
+        double mass = getMass(mpar, mch);
+
+        /**
+         * Kinetic energy index - z-position:
+         * Index     Z (cm)     MC Index
+         *   0       65.97          4
+         *   -       65.20          -        (TOF S1)
+         *   1       62.87          6
+         *   -       62.10          -        (TOF S2)
+         *   2       53.06          7
+         *   3      -61.33         15
+         *   -      -62.10          -        (TOF S3)
+         *   4      -63.27         14
+         *   -      -65.20          -        (TOF S4)
+         *   5      -69.98         17
+         */
+        double kineticEnergy[6]{};
+        kineticEnergy[0] = sqrt(mevmom1[4] * mevmom1[4] + mass * mass) - mass;
+        kineticEnergy[1] = sqrt(mevmom1[6] * mevmom1[6] + mass * mass) - mass;
+        kineticEnergy[2] = sqrt(mevmom1[7] * mevmom1[7] + mass * mass) - mass;
+        kineticEnergy[3] = sqrt(mevmom1[15] * mevmom1[15] + mass * mass) - mass;
+        kineticEnergy[4] = sqrt(mevmom1[14] * mevmom1[14] + mass * mass) - mass;
+        kineticEnergy[5] = sqrt(mevmom1[17] * mevmom1[17] + mass * mass) - mass;
+
+        energyDepositedS1S2 = (tof_edep[0] + tof_edep[1]) * 1e-3;
+        energyDepositedTotal = (tof_edep[0] + tof_edep[1] + tof_edep[2] + tof_edep[3]) * 1e-3;
+        energyLoss_S1S2_ = kineticEnergy[0] - kineticEnergy[2];
+        energyLoss_S1S4_ = kineticEnergy[0] - kineticEnergy[5];
+        energyLossScaleS1S2 = energyLoss_S1S2_ / energyDepositedS1S2;
+        energyLossScaleTotal = energyLoss_S1S4_ / energyDepositedTotal;
+        energyLossS2__S3 = kineticEnergy[2] - kineticEnergy[3];
+        energyLossS2S3_Total = energyLossS2__S3 / energyLoss_S1S4_;
+        mcBeta = mevmom1[4] / sqrt(mevmom1[4] * mevmom1[4] + mass * mass);
+
+        treeOut->Fill();
+    }
+
+    treeOut->Write();
+    fileOut->Close();
+
+    fileIn->Close();
+    return true;
+}

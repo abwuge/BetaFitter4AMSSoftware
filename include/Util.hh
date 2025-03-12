@@ -51,6 +51,15 @@ namespace Util
      * @return bool True if calculation succeeds, false otherwise
      */
     bool calculateTOFEnergyLoss(const ParticleData &particle, double beta, double energyLoss[4]);
+
+    /**
+     * @brief Calculate energy loss information
+     * 
+     * @param inputFile Path to the ROOT file containing particle data
+     * @param outputFile Path to save the ROOT file containing energy loss information
+     * @return bool True if calculation succeeds, false otherwise
+     */
+    bool saveEnergyLoss(const std::string &inputFile, const std::string &outputFile);
 }
 
 #endif // __UTIL_HH__
