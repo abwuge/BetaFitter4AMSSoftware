@@ -71,6 +71,7 @@ bool ParticlePropagator::PropagateToTOF(double trackerHitX[ParticleData::TRACKER
     int iMax = ParticleData::TOF_MAX_HITS, jMax = ParticleData::TRACKER_MAX_HITS - 1;
 
     // Propagate according to z position
+    UpdateWithEnergyLoss(0);
     while (i < iMax || j < jMax)
     {
         // Get next target z position
