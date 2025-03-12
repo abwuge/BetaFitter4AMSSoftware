@@ -36,11 +36,21 @@ namespace Util
 
     /**
      * @brief Save magnetic field information to ROOT file
-     * 
+     *
      * @param outputFile Path to save the ROOT file containing magnetic field data
      * @return bool True if saving succeeds, false otherwise
      */
     bool saveMagneticField(const std::string &outputFile);
+
+    /**
+     * @brief Calculate TOF energy loss for a particle
+     *
+     * @param particle Particle data
+     * @param beta Particle beta
+     * @param energyLoss Array to store energy loss in each TOF layer [output]
+     * @return bool True if calculation succeeds, false otherwise
+     */
+    bool calculateTOFEnergyLoss(const ParticleData &particle, double beta, double energyLoss[4]);
 }
 
 #endif // __UTIL_HH__

@@ -221,3 +221,32 @@ bool Util::saveMagneticField(const std::string &outputFile)
 
     return true;
 }
+
+bool Util::calculateTOFEnergyLoss(const ParticleData &particle, double beta, double energyLoss[4])
+{
+    // not implemented
+
+    // // Calculate momentum and rigidity from beta
+    // double gamma = 1.0 / std::sqrt(1.0 - beta * beta);
+    // double momentum = gamma * beta * particle.mass;
+    // double rigidity = momentum / particle.charge;
+
+    // // Create particle propagator
+    // ParticlePropagator propagator(particle);
+    // propagator.resetPropagator(beta);
+
+    // // Calculate energy loss for each TOF layer
+    // for (int i = 0; i < ParticleData::TOF_MAX_HITS; ++i)
+    // {
+    //     // Calculate energy loss
+    //     double layer_length = propagator.Propagate(particle.TOF_hitZ[i]);
+    //     if (layer_length < 0)
+    //         return false;
+
+    //     double layer_time = layer_length / (beta * SPEED_OF_LIGHT);
+    //     double layer_energy_loss = particle.mass * (1.0 / beta - 1.0 / gamma) * SPEED_OF_LIGHT * layer_time;
+    //     energyLoss[i] = layer_energy_loss;
+    // }
+
+    return false;
+}

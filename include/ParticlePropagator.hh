@@ -24,7 +24,7 @@ private:
     float tracker_z[ParticleData::TRACKER_MAX_HITS]{};
     float energyLoss[ParticleData::TOF_MAX_HITS]{};
 
-    double _energyLossScale;  // Energy loss scale factor
+    double _energyLossScale; // Energy loss scale factor
 
     /**
      * Initialize particle propagator with given parameters
@@ -84,20 +84,13 @@ public:
      */
     double GetMomentum() const;
 
+    /**
+     * Set energy loss scale factor
+     * @param scale Energy loss scale factor
+     */
     void SetEnergyLossScale(double scale) { _energyLossScale = scale; }
-    double GetEnergyLossScale() const { return _energyLossScale; }
 
 private:
-    /**
-     * Update particle kinematics considering energy loss
-     * @param start_point Starting position for energy loss calculation
-     * @param direction Particle direction for energy loss calculation
-     * @param z_target Target z position for energy loss calculation
-     */
-    void UpdateWithEnergyLoss(const AMSPoint &start_point,
-                              const AMSDir &direction,
-                              double z_target);
-
     /**
      * Update particle kinematics considering energy loss using TOF energy deposit
      * @param i Index of the TOF layer
