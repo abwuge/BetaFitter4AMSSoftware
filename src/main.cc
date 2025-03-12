@@ -36,13 +36,16 @@ int main(int argc, char **argv)
     BetaFitter::fitOption = argc > 3 ? atoi(argv[3]) : 0;
 
     // Handle magnetic field information saving
-    if (BetaFitter::fitOption == -1) {
+    if (BetaFitter::fitOption == -1)
         return Util::saveMagneticField(outputFile) ? 0 : 1;
-    }
 
     // Normal beta reconstruction workflow
     if (BetaFitter::fitOption < 0 || BetaFitter::fitOption > 2)
         BetaFitter::fitOption = 0;
+
+    double els = argc > 4 ? atof(argv[4]) : 1;
+    if (els < 1)
+        els = 1;
 
     // Load particle data from input file
     std::vector<ParticleData> particles = Util::loadParticleData(inputFile);
@@ -83,6 +86,7 @@ int main(int argc, char **argv)
 
         // Setup particle propagator with initial state
         ParticlePropagator propagator(particle);
+        propagator.SetEnergyLossScale(els);
 
         // Get beta values
         mcBeta = particle.mcBeta;
