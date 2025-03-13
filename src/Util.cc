@@ -294,7 +294,6 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
 
     TTree *treeOut = new TTree("energyLoss", "Energy Loss Information");
 
-    float mcBeta = 0.0;               // Monte Carlo beta
     float energyDepositedS1S2 = 0.0;  // energy deposited from before S1 to after S2
     float energyDepositedTotal = 0.0; // total energy deposited
     float energyLoss_S1S2_ = 0.0;     // energy loss from before S1 to after S2
@@ -303,6 +302,7 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
     float energyLossScaleTotal = 0.0; // energy loss scale factor from before S1 to after S4
     float energyLossS2__S3 = 0.0;     // energy loss from after S2 to before S3
     float energyLossS2S3_Total = 0.0; // energy loss from after S2 to before S3, normalized to total energy loss
+    float mcBeta = 0.0;               // Monte Carlo beta
 
     treeOut->Branch("energyDepositedS1S2", &energyDepositedS1S2, "energyDepositedS1S2/F");
     treeOut->Branch("energyDepositedTotal", &energyDepositedTotal, "energyDepositedTotal/F");
