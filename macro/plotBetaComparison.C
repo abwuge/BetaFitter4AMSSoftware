@@ -18,7 +18,7 @@
  * @param fileName Path to the input ROOT file
  * @param outputName Output file name (default: test_beta_comparison.pdf)
  */
-void plotBetaComparison(const char *fileName = "test.root",
+void plotBetaComparison(std::string fileName = "test.root",
                         const char *outputName = "test_beta_comparison.pdf")
 {
     // Set batch mode to avoid GUI related issues
@@ -29,7 +29,10 @@ void plotBetaComparison(const char *fileName = "test.root",
     gStyle->SetEndErrorSize(20);
 
     // Open the ROOT file
-    TFile *file = TFile::Open(fileName, "READ");
+    if (fileName.size() < 5 || fileName.substr(fileName.size() - 5) != ".root")
+        fileName += ".root";
+
+    TFile *file = TFile::Open(fileName.c_str(), "READ");
     if (!file || file->IsZombie())
     {
         std::cerr << "Error: Could not open file " << fileName << std::endl;
@@ -100,11 +103,11 @@ void plotBetaComparison(const char *fileName = "test.root",
         hLinearResVsMC->Fill(mcBeta, linearRes);
     }
 
-    // Arrays to store fit results
+    // Arrays to store fit results and weights
     const int nProfiles = nBinsX;
     double mcBetaValues[nProfiles];
-    double nonlinearMean[nProfiles], nonlinearError[nProfiles];
-    double linearMean[nProfiles], linearError[nProfiles];
+    double nonlinearMean[nProfiles], nonlinearError[nProfiles], nonlinearWeight[nProfiles];
+    double linearMean[nProfiles], linearError[nProfiles], linearWeight[nProfiles];
 
     // Print table header before the loop
     std::cout << std::endl;
@@ -177,7 +180,9 @@ void plotBetaComparison(const char *fileName = "test.root",
         }
         delete projLinear;
 
-        // Print data in aligned columns using tabs
+        // Print data in aligned columns using tabs and store weights
+        nonlinearWeight[bin] = projNLEntries;
+        linearWeight[bin] = projLEntries;
         printf("%d\t%.6f\t%d\t%d\t%.6f\t%.6f\n",
                bin, binCenter, projNLEntries, projLEntries,
                nonlinearMean[bin], linearMean[bin]);
@@ -248,23 +253,60 @@ void plotBetaComparison(const char *fileName = "test.root",
                             100, xMin, xMax, 100, yMinRes, yMaxRes);
     hFrame->Draw();
 
-    // Draw both graphs with different styles
+    // Define fit functions
+    TF1 *fNonlinear = new TF1("fNonlinear", "[0] * exp(-[1] * x)", xMin, xMax);
+    fNonlinear->SetParameters(0.1, 5.0, 0.0); // Initial parameters
+    fNonlinear->SetLineColor(kBlue);
+    fNonlinear->SetLineStyle(2);
+
+    TF1 *fLinear = new TF1("fLinear", "[0] * exp(-[1] * x)", xMin, xMax);
+    fLinear->SetParameters(0.1, 5.0, 0.0); // Initial parameters
+    fLinear->SetLineColor(kRed);
+    fLinear->SetLineStyle(2);
+
+    // Create and setup graphs with weights
     grNonlinear->SetMarkerStyle(20);
     grNonlinear->SetMarkerColor(kBlue);
     grNonlinear->SetLineColor(kBlue);
     grNonlinear->SetMarkerSize(3.0);
+
+    // Set point weights for fitting
+    for (int i = 0; i < nProfiles; i++)
+    {
+        grNonlinear->SetPointError(i, 0, nonlinearError[i]);
+        if (nonlinearWeight[i] > 0)
+            grNonlinear->SetPointError(i, 0, nonlinearError[i] / sqrt(nonlinearWeight[i]));
+    }
+    grNonlinear->Fit(fNonlinear, "QR"); // Q for quiet, R for using range
     grNonlinear->Draw("LP");
 
     grLinear->SetMarkerStyle(21);
     grLinear->SetMarkerColor(kRed);
     grLinear->SetLineColor(kRed);
     grLinear->SetMarkerSize(3.0);
+
+    // Set point weights for fitting
+    for (int i = 0; i < nProfiles; i++)
+    {
+        grLinear->SetPointError(i, 0, linearError[i]);
+        if (linearWeight[i] > 0)
+            grLinear->SetPointError(i, 0, linearError[i] / sqrt(linearWeight[i]));
+    }
+    grLinear->Fit(fLinear, "QR");
     grLinear->Draw("LP");
 
-    // Add legend
-    TLegend *legend = new TLegend(0.55, 0.7, 0.85, 0.85);
+    // Add legend with fit equations
+    TLegend *legend = new TLegend(0.45, 0.65, 0.85, 0.85);
     legend->AddEntry(grNonlinear, "Non-linear Method", "lp");
+    if (fNonlinear->GetParameter(1) > 0)
+        legend->AddEntry(fNonlinear, Form("Fit: %.2fe^{-%.2fx}", fNonlinear->GetParameter(0), fNonlinear->GetParameter(1)), "l");
+    else
+        legend->AddEntry(fNonlinear, Form("Fit: %.2fe^{%.2fx}", fNonlinear->GetParameter(0), -fNonlinear->GetParameter(1)), "l");
     legend->AddEntry(grLinear, "Linear Method", "lp");
+    if (fLinear->GetParameter(1) > 0)
+        legend->AddEntry(fLinear, Form("Fit: %.2fe^{-%.2fx}", fLinear->GetParameter(0), fLinear->GetParameter(1)), "l");
+    else
+        legend->AddEntry(fLinear, Form("Fit: %.2fe^{%.2fx}", fLinear->GetParameter(0), -fLinear->GetParameter(1)), "l");
     legend->SetBorderSize(0);
     legend->Draw();
 
