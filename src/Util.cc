@@ -275,11 +275,13 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
         return false;
     }
 
+    int tof_qs = 0; // Q Status (1111: all unoverlapped, 0000: all overlapped, left to right: S1, S2, S3, S4)
     int mpar = 0;
     float mch = 0.0f;
     float mevmom1[21] = {0};
     float tof_edep[4] = {0};
 
+    treeIn->SetBranchAddress("tof_qs", &tof_qs);
     treeIn->SetBranchAddress("mpar", &mpar);
     treeIn->SetBranchAddress("mch", &mch);
     treeIn->SetBranchAddress("mevmom1", mevmom1);
@@ -313,6 +315,7 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
     treeOut->Branch("energyLossS2__S3", &energyLossS2__S3, "energyLossS2__S3/F");
     treeOut->Branch("energyLossS2S3_Total", &energyLossS2S3_Total, "energyLossS2S3_Total/F");
     treeOut->Branch("mcBeta", &mcBeta, "mcBeta/F");
+    treeOut->Branch("tof_qs", &tof_qs, "tof_qs/I");
 
     // Read all entries
     Long64_t nEntries = treeIn->GetEntries();

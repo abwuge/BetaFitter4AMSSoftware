@@ -54,7 +54,7 @@ done < "$INPUT_LIST"
 # Wait for all background processes to complete
 wait
 
-read -p "hadd all root files? [Y/n] " response
+read -p "Hadd all root files? [Y/n] " response
 response=${response:-Y}
 if [[ $response =~ ^([yY][eE][sS]|[yY])$ ]]; then
     ./hadd.sh $RUN_NUM

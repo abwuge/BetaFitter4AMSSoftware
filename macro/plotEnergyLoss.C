@@ -67,6 +67,7 @@ void plotEnergyLoss(std::string fileName = "test.root",
     float energyLossS2__S3 = 0.0;     // energy loss from after S2 to before S3
     float energyLossS2S3_Total = 0.0; // energy loss from after S2 to before S3, normalized to total energy loss
     float mcBeta = 0.0;               // Monte Carlo beta
+    int tof_qs = 0;                   // Q Status (1111: all unoverlapped, 0000: all overlapped)
 
     // Set branch addresses
     tree->SetBranchAddress("energyDepositedS1S2", &energyDepositedS1S2);
@@ -78,6 +79,7 @@ void plotEnergyLoss(std::string fileName = "test.root",
     tree->SetBranchAddress("energyLossS2__S3", &energyLossS2__S3);
     tree->SetBranchAddress("energyLossS2S3_Total", &energyLossS2S3_Total);
     tree->SetBranchAddress("mcBeta", &mcBeta);
+    tree->SetBranchAddress("tof_qs", &tof_qs);
 
     // Get beta range for proper binning
     double mcBetaMin = tree->GetMinimum("mcBeta");
@@ -125,6 +127,14 @@ void plotEnergyLoss(std::string fileName = "test.root",
                                      ";Energy Deposited (S1-S2) [GeV];Energy Loss (S1-S2) [GeV];",
                                      nBins, 0.1, 0.7, nBins, 0, 1);
 
+    TH2F *hEnergyLossS1S2_Unoverlapped = new TH2F("hEnergyLossS1S2_Unoverlapped",
+                                                  "Unoverlapped S1&S2;Energy Deposited (S1-S2) [GeV];Energy Loss (S1-S2) [GeV];",
+                                                  nBins, 0.1, 0.7, nBins, 0, 1);
+
+    TH2F *hEnergyLossS1S2_Overlapped = new TH2F("hEnergyLossS1S2_Overlapped",
+                                                "Overlapped S1&S2;Energy Deposited (S1-S2) [GeV];Energy Loss (S1-S2) [GeV];",
+                                                nBins, 0.1, 0.7, nBins, 0, 1);
+
     // Fill histograms
     Long64_t nEntries = tree->GetEntries();
     for (Long64_t i = 0; i < nEntries; ++i)
@@ -136,6 +146,17 @@ void plotEnergyLoss(std::string fileName = "test.root",
         hEnergyLossS2__S3->Fill(energyLossS2__S3);
         hEnergyLossS2S3_Total->Fill(energyLossS2S3_Total);
         hEnergyLossS1S2->Fill(energyDepositedS1S2, energyLoss_S1S2_);
+
+        // Check if S1 and S2 are unoverlapped (11xx)
+        bool isS1S2Unoverlapped = tof_qs / 100 == 11;
+        if (isS1S2Unoverlapped)
+        {
+            hEnergyLossS1S2_Unoverlapped->Fill(energyDepositedS1S2, energyLoss_S1S2_);
+        }
+        else
+        {
+            hEnergyLossS1S2_Overlapped->Fill(energyDepositedS1S2, energyLoss_S1S2_);
+        }
 
         // Fill 2D histograms vs Beta
         hEnergyLossScaleS1S2VsBeta->Fill(mcBeta, energyLossScaleS1S2);
@@ -306,6 +327,12 @@ void plotEnergyLoss(std::string fileName = "test.root",
     hEnergyLossS1S2->Draw("colz");
     canvas->Print(outputName);
 
+    hEnergyLossS1S2_Unoverlapped->Draw("colz");
+    canvas->Print(outputName);
+
+    hEnergyLossS1S2_Overlapped->Draw("colz");
+    canvas->Print(outputName);
+
     // 2D histograms with beta correlation
     TCanvas *c1 = new TCanvas("c1", "Energy Loss Scale S1S2 vs Beta", 3508, 2480);
     c1->SetLeftMargin(0.16);
@@ -430,35 +457,11 @@ void plotEnergyLoss(std::string fileName = "test.root",
     c5->Print(outputName);
     c5->Print(Form("%s]", outputName)); // Close PDF file
 
-    // Clean up
-    delete legend;
-    delete hFrame;
-    delete c5;
-    delete grS2S3Tot;
-    delete grS2S3;
-    delete grTotal;
-    delete grS1S2;
-    delete c4;
-    delete c3;
-    delete c2;
-    delete c1;
-    delete hEnergyLossS2S3_TotalVsBeta;
-    delete hEnergyLossS2__S3VsBeta;
-    delete hEnergyLossScaleTotalVsBeta;
-    delete hEnergyLossScaleS1S2VsBeta;
-    delete hEnergyLossS2__S3;
-    delete hEnergyLossScaleTotal;
-    delete hEnergyLossScaleS1S2;
-    delete hEnergyLossS2S3_Total;
-    delete hEnergyLossS1S2;
-    delete canvas;
-
-    // Reset tree branches to avoid dangling pointers
-    tree->ResetBranchAddresses();
-
     // Close and delete the file after all references are gone
     file->Close();
-    delete file;
 
     std::cout << "Energy loss plots saved to: " << outputName << std::endl;
+
+    // Since this is the end of this macro
+    // We do NOT need to delete the pointers
 }
