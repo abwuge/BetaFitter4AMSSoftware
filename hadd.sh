@@ -5,4 +5,8 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-hadd -j32 -f -k results/$1.root results/$1_*.root
+hadd -j64 -f -k results/$1.root results/$1_*.root
+
+rm -f results/$1_*.root
+
+echo "Hadd completed!"

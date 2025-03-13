@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Default maximum number of parallel processes
-MAX_PROCS=${1:-32}
+MAX_PROCS=${1:-64}
 
 # Get the script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -18,7 +18,17 @@ get_running_jobs() {
     jobs -p | wc -l
 }
 
+get_next_run_num() {
+    local i=0
+    while [[ -e "${RESULTS_DIR}/${i}.root" ]]; do
+        i=$((i + 1))
+    done
+    echo "$i"
+}
+RUN_NUM=$(get_next_run_num)
+
 # Process each input file
+counter=0
 while IFS= read -r input_file; do
     # Skip empty lines and comments
     [[ -z "$input_file" || "${input_file:0:1}" == "#" ]] && continue
@@ -28,10 +38,12 @@ while IFS= read -r input_file; do
         sleep 1
     done
     
-    # Generate output filename based on input filename
-    filename=$(basename "$input_file")
-    output_file="${RESULTS_DIR}/${filename}"
-    log_file="${LOGS_DIR}/${filename%.root}.log"
+    # Generate output filename
+    basename=${RUN_NUM}_${counter}
+    output_file="${RESULTS_DIR}/${basename}.root"
+    log_file="${LOGS_DIR}/${basename}.log"
+    
+    ((counter++))
     
     # Run the process in background
     ("${SCRIPT_DIR}/run.csh" "$input_file" "$output_file" > "$log_file" 2>&1) &
@@ -41,5 +53,13 @@ done < "$INPUT_LIST"
 
 # Wait for all background processes to complete
 wait
+
+read -p "hadd all root files? [Y/n] " response
+response=${response:-Y}
+if [[ $response =~ ^([yY][eE][sS]|[yY])$ ]]; then
+    ./hadd.sh $RUN_NUM
+else
+    echo "Skipping hadd operation."
+fi
 
 echo "All jobs completed!"
