@@ -4,7 +4,7 @@
 Z=${1:-8}
 fitOption=${2:-0}
 energyLossScale=${3:-2.0}
-MAX_PROCS=${4:-64}
+MAX_PROCS=${4:-100}
 
 # Get the script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -57,7 +57,7 @@ done < "$INPUT_LIST"
 # Wait for all background processes to complete
 wait
 
-read -p "Hadd all root files? [Y/n] " response
+read -t 5 -p "Hadd all root files? [Y/n] " response
 response=${response:-Y}
 if [[ $response =~ ^([yY][eE][sS]|[yY])$ ]]; then
     ./hadd.sh $RUN_NUM

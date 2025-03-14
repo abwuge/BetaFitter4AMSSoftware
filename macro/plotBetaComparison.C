@@ -111,10 +111,10 @@ std::pair<int, double> getParamsFromReadme(const std::string &fileName)
  * Draw beta comparison plots from a ROOT file containing betaTree
  *
  * @param fileName Path to the input ROOT file
- * @param outputName Output file name (default: test_beta_comparison.pdf)
+ * @param outputName Output file name (default: auto-generated based on Z and ELS values)
  */
 void plotBetaComparison(std::string fileName = "test.root",
-                        const char *outputName = "test_beta_comparison.pdf")
+                        const char *outputName = nullptr)
 {
     // Set batch mode to avoid GUI related issues
     gROOT->SetBatch(true);
@@ -139,6 +139,23 @@ void plotBetaComparison(std::string fileName = "test.root",
             std::cerr << "Error: Unable to find/open file " << fileName << std::endl;
             return;
         }
+    }
+
+    // Auto-generate output name if not specified
+
+    // Get Z value and energyLossScale from the file
+    auto params = getParamsFromReadme(fileName);
+    int zValue = params.first;
+    double energyLossScale = params.second;
+    std::string actualOutputName;
+
+    if (!outputName)
+    {
+        if (zValue > 0 && energyLossScale > 0)
+            actualOutputName = Form("test_Z%d_ELS%.1f.pdf", zValue, energyLossScale);
+        else
+            actualOutputName = "test_beta_comparison.pdf";
+        outputName = actualOutputName.c_str();
     }
 
     // Get the beta reconstruction tree
@@ -442,11 +459,6 @@ void plotBetaComparison(std::string fileName = "test.root",
     zeroLine->SetLineStyle(2);
     zeroLine->SetLineColor(kGray + 2);
     zeroLine->Draw("SAME");
-
-    // Get Z value and energyLossScale from the file
-    auto params = getParamsFromReadme(fileName);
-    int zValue = params.first;
-    double energyLossScale = params.second;
 
     // Add Z value and energyLossScale at the top center if available
     TPaveText *infoText = nullptr;
