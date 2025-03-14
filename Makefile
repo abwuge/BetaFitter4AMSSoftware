@@ -1,8 +1,15 @@
 # Define directories
 SRCDIR=src
 BUILDDIR=build
-OBJDIR=$(BUILDDIR)/obj
-BINDIR=$(BUILDDIR)/bin
+
+# Define default target directories and run directories
+ifeq ($(MAKECMDGOALS),)
+  OBJDIR=$(BUILDDIR)/obj/run
+  BINDIR=$(BUILDDIR)/bin/run
+else
+  OBJDIR=$(BUILDDIR)/obj
+  BINDIR=$(BUILDDIR)/bin
+endif
 
 # Define source files and objects
 SOURCES=$(wildcard $(SRCDIR)/*.cc)
@@ -167,8 +174,7 @@ $(EXE): $(OBJECTS) $(NTUPLE_LIB)
 	$(CXX) -o $@ $(OBJECTS) $(CXXFLAGS) $(DEFINES) -L$(NTUPLE_LIBDIR) -lntuple_slc6_PG$(LIB_SUFFIX) $(shell root-config --libs) -lMinuit -lTMVA -lNetx -lGeom -lMathMore -lEG -lTreePlayer -lMLP -lXMLIO $(LIBAUXS) $(CERNLIB)
 
 clean:
-	rm -f $(BUILDDIR)/obj/*
-	rm -f $(BUILDDIR)/bin/betaFitter*
+	rm -f $(BUILDDIR)/*
 
 # Handle debug target
 debug: OPTFLAGS=-O0 -g
