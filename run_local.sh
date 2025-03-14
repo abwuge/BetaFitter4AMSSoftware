@@ -2,7 +2,9 @@
 
 # Default maximum number of parallel processes
 Z=${1:-8}
-MAX_PROCS=${2:-64}
+fitOption=${2:-0}
+energyLossScale=${3:-2.0}
+MAX_PROCS=${4:-64}
 
 # Get the script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -47,7 +49,7 @@ while IFS= read -r input_file; do
     ((counter++))
     
     # Run the process in background
-    ("${SCRIPT_DIR}/run.csh" "$input_file" "$output_file" > "$log_file" 2>&1) &
+    ("${SCRIPT_DIR}/run.csh" "$input_file" "$output_file" "$fitOption" "$energyLossScale" > "$log_file" 2>&1) &
     
     echo "Started processing: $input_file"
 done < "$INPUT_LIST"
