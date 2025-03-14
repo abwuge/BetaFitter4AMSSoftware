@@ -321,9 +321,6 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
     {
         treeIn->GetEntry(i);
 
-        if (mch != 8)
-            continue;
-
         if (mevmom1[4] == -1000 || mevmom1[6] == -1000 || mevmom1[7] == -1000 || mevmom1[15] == -1000 || mevmom1[14] == -1000 || mevmom1[17] == -1000)
             continue;
 
@@ -370,14 +367,12 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
         fileOut->Close();
         return false;
     }
-
-    treeOut->Write();
-    fileOut->Close();
-
-    fileIn->Close();
-
-    std::cout << "Energy loss information saved to " << outputFile << std::endl;
     std::cout << "Total entries: " << treeOut->GetEntries() << std::endl;
+    treeOut->Write();
+    std::cout << "Energy loss information saved to " << outputFile << std::endl;
+
+    fileOut->Close();
+    fileIn->Close();
 
     return true;
 }
