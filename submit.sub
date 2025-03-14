@@ -1,8 +1,6 @@
-Z = 8
-
 universe     = vanilla
 executable   = /nas01/home/hxwu/AMSSoft/betaFitter/run.csh
-arguments    = $(inputfile) /nas01/home/hxwu/AMSSoft/betaFitter/results/$(Cluster)_$(Process).root
+arguments    = $(inputfile) /nas01/home/hxwu/AMSSoft/betaFitter/results/$(Cluster)_$(Process).root $(fitOption) $(energyLossScale)
 
 request_cpus = 1
 
