@@ -6,7 +6,7 @@ MAX_PROCS=${2:-64}
 
 # Get the script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-INPUT_LIST="${SCRIPT_DIR}/input_Z$(Z).list"
+INPUT_LIST="${SCRIPT_DIR}/input_Z${Z}.list"
 RESULTS_DIR="${SCRIPT_DIR}/results"
 LOGS_DIR="${SCRIPT_DIR}/logs"
 
