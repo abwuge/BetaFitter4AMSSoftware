@@ -88,59 +88,115 @@ void plotEnergyLoss(std::string fileName = "test.root",
     tree->SetBranchAddress("mcBeta", &mcBeta);
     tree->SetBranchAddress("tof_qs", &tof_qs);
 
-    // Get beta range for proper binning
+    // Helper function to get range using quantiles
+    auto getQuantileRange = [&tree](const char* branchName, double lowQuantile = 0.01, double highQuantile = 0.99) {
+        // Create a high-precision temporary histogram
+        TH1D hTemp(Form("hTemp_%s", branchName), "", 10000, tree->GetMinimum(branchName), tree->GetMaximum(branchName));
+        tree->Draw(Form("%s>>hTemp_%s", branchName, branchName), "", "goff");
+        
+        // Calculate quantiles
+        Double_t xq[2] = {lowQuantile, highQuantile};
+        Double_t yq[2] = {0, 0};
+        hTemp.GetQuantiles(2, yq, xq);
+        
+        std::cout << "Range for " << branchName << " using quantiles: [" << yq[0] << ", " << yq[1] << "]" << std::endl;
+        return std::make_pair(yq[0], yq[1]);
+    };
+
+    // Get ranges for all variables using quantiles
+    auto energyDepositedS1S2Range = getQuantileRange("energyDepositedS1S2");
+    auto energyLoss_S1S2_Range = getQuantileRange("energyLoss_S1S2_");
+    auto energyLossScaleS1S2Range = getQuantileRange("energyLossScaleS1S2");
+    auto energyLossScaleTotalRange = getQuantileRange("energyLossScaleTotal");
+    auto energyLossS2__S3Range = getQuantileRange("energyLossS2__S3");
+    auto energyLossS2S3_TotalRange = getQuantileRange("energyLossS2S3_Total");
+
+    // Extract values for readability
     double mcBetaMin = tree->GetMinimum("mcBeta");
     double mcBetaMax = tree->GetMaximum("mcBeta");
+    double energyDepositedS1S2Min = energyDepositedS1S2Range.first;
+    double energyDepositedS1S2Max = energyDepositedS1S2Range.second;
+    double energyLoss_S1S2_Min = energyLoss_S1S2_Range.first;
+    double energyLoss_S1S2_Max = energyLoss_S1S2_Range.second;
+    double energyLossScaleS1S2Min = energyLossScaleS1S2Range.first;
+    double energyLossScaleS1S2Max = energyLossScaleS1S2Range.second;
+    double energyLossScaleTotalMin = energyLossScaleTotalRange.first;
+    double energyLossScaleTotalMax = energyLossScaleTotalRange.second;
+    double energyLossS2__S3Min = energyLossS2__S3Range.first;
+    double energyLossS2__S3Max = energyLossS2__S3Range.second;
+    double energyLossS2S3_TotalMin = energyLossS2S3_TotalRange.first;
+    double energyLossS2S3_TotalMax = energyLossS2S3_TotalRange.second;
+
+    // Add some margin to ranges (5%)
+    auto addMargin = [](double min, double max) {
+        double margin = 0.05 * (max - min);
+        return std::make_pair(min - margin, max + margin);
+    };
+
+    // Apply margins to ranges
+    std::tie(energyLossScaleS1S2Min, energyLossScaleS1S2Max) = addMargin(energyLossScaleS1S2Min, energyLossScaleS1S2Max);
+    std::tie(energyLossScaleTotalMin, energyLossScaleTotalMax) = addMargin(energyLossScaleTotalMin, energyLossScaleTotalMax);
+    std::tie(energyLossS2__S3Min, energyLossS2__S3Max) = addMargin(energyLossS2__S3Min, energyLossS2__S3Max);
+    std::tie(energyLossS2S3_TotalMin, energyLossS2S3_TotalMax) = addMargin(energyLossS2S3_TotalMin, energyLossS2S3_TotalMax);
+    std::tie(energyDepositedS1S2Min, energyDepositedS1S2Max) = addMargin(energyDepositedS1S2Min, energyDepositedS1S2Max);
+    std::tie(energyLoss_S1S2_Min, energyLoss_S1S2_Max) = addMargin(energyLoss_S1S2_Min, energyLoss_S1S2_Max);
 
     // Number of bins for histograms
     int nBins = 100;  // Number of bins for 1D histograms
     int nBinsX = 40;  // Number of bins in X direction (beta) for 2D histograms
     int nBinsY = 100; // Number of bins in Y direction for 2D histograms
 
-    // Create 1D histograms
+    // Create 1D histograms with ranges from quantiles
     TH1F *hEnergyLossScaleS1S2 = new TH1F("hEnergyLossScaleS1S2",
                                           ";Energy Loss Scale Factor (S1-S2);",
-                                          nBins, 0, 4);
+                                          nBins, energyLossScaleS1S2Min, energyLossScaleS1S2Max);
 
     TH1F *hEnergyLossScaleTotal = new TH1F("hEnergyLossScaleTotal",
                                            ";Total Energy Loss Scale Factor (S1-S4);",
-                                           nBins, 0, 4);
+                                           nBins, energyLossScaleTotalMin, energyLossScaleTotalMax);
 
     TH1F *hEnergyLossS2__S3 = new TH1F("hEnergyLossS2__S3",
                                        ";Energy Loss Between S2 and S3 [GeV];",
-                                       nBins, 0, 1);
+                                       nBins, energyLossS2__S3Min, energyLossS2__S3Max);
 
     TH1F *hEnergyLossS2S3_Total = new TH1F("hEnergyLossS2S3_Total",
                                            ";Energy Loss Between S2 and S3 (Total);",
-                                           nBins, 0, 1);
+                                           nBins, energyLossS2S3_TotalMin, energyLossS2S3_TotalMax);
 
     TH2F *hEnergyLossScaleS1S2VsBeta = new TH2F("hEnergyLossScaleS1S2VsBeta",
                                                 ";#beta_{MC};Energy Loss Scale Factor (S1-S2)",
-                                                nBinsX, mcBetaMin, mcBetaMax, nBinsY, 0, 4);
+                                                nBinsX, mcBetaMin, mcBetaMax, 
+                                                nBinsY, energyLossScaleS1S2Min, energyLossScaleS1S2Max);
 
     TH2F *hEnergyLossScaleTotalVsBeta = new TH2F("hEnergyLossScaleTotalVsBeta",
                                                  ";#beta_{MC};Total Energy Loss Scale Factor (S1-S4)",
-                                                 nBinsX, mcBetaMin, mcBetaMax, nBinsY, 0, 4);
+                                                 nBinsX, mcBetaMin, mcBetaMax, 
+                                                 nBinsY, energyLossScaleTotalMin, energyLossScaleTotalMax);
 
     TH2F *hEnergyLossS2__S3VsBeta = new TH2F("hEnergyLossS2__S3VsBeta",
                                              ";#beta_{MC};Energy Loss Between S2 and S3 [GeV]",
-                                             nBinsX, mcBetaMin, mcBetaMax, nBinsY, 0, 1);
+                                             nBinsX, mcBetaMin, mcBetaMax, 
+                                             nBinsY, energyLossS2__S3Min, energyLossS2__S3Max);
 
     TH2F *hEnergyLossS2S3_TotalVsBeta = new TH2F("hEnergyLossS2S3_TotalVsBeta",
                                                  ";#beta_{MC};Energy Loss Between S2 and S3 (Total)",
-                                                 nBinsX, mcBetaMin, mcBetaMax, nBinsY, 0, 1);
+                                                 nBinsX, mcBetaMin, mcBetaMax, 
+                                                 nBinsY, energyLossS2S3_TotalMin, energyLossS2S3_TotalMax);
 
     TH2F *hEnergyLossS1S2 = new TH2F("hEnergyLossS1S2",
                                      ";Energy Deposited (S1-S2) [GeV];Energy Loss (S1-S2) [GeV];",
-                                     nBins, 0.1, 0.7, nBins, 0, 1);
+                                     nBins, energyDepositedS1S2Min, energyDepositedS1S2Max, 
+                                     nBins, energyLoss_S1S2_Min, energyLoss_S1S2_Max);
 
     TH2F *hEnergyLossS1S2_Unoverlapped = new TH2F("hEnergyLossS1S2_Unoverlapped",
                                                   "Unoverlapped S1&S2;Energy Deposited (S1-S2) [GeV];Energy Loss (S1-S2) [GeV];",
-                                                  nBins, 0.1, 0.7, nBins, 0, 1);
+                                                  nBins, energyDepositedS1S2Min, energyDepositedS1S2Max, 
+                                                  nBins, energyLoss_S1S2_Min, energyLoss_S1S2_Max);
 
     TH2F *hEnergyLossS1S2_Overlapped = new TH2F("hEnergyLossS1S2_Overlapped",
                                                 "Overlapped S1&S2;Energy Deposited (S1-S2) [GeV];Energy Loss (S1-S2) [GeV];",
-                                                nBins, 0.1, 0.7, nBins, 0, 1);
+                                                nBins, energyDepositedS1S2Min, energyDepositedS1S2Max, 
+                                                nBins, energyLoss_S1S2_Min, energyLoss_S1S2_Max);
 
     // Fill histograms
     Long64_t nEntries = tree->GetEntries();
