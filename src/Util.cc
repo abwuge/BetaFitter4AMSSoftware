@@ -141,10 +141,6 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
         data.betaLinear = tof_betah;
         data.momentum = data.mass * data.betaLinear / sqrt(1 - data.betaLinear * data.betaLinear);
 
-        // TODO: This is a temporary method for filtering out fragmental particles
-        if (data.charge < 6)
-            continue;
-
         particles.push_back(data);
     }
 

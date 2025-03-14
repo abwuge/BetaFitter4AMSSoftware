@@ -49,9 +49,9 @@ int main(int argc, char **argv)
     if (BetaFitter::fitOption < 0 || BetaFitter::fitOption > 2)
         BetaFitter::fitOption = 0;
 
-    double els = argc > 4 ? atof(argv[4]) : 1;
+    double els = argc > 4 ? atof(argv[4]) : 2;
     if (els < 1)
-        els = 1;
+        els = 2;
 
     // Load particle data from input file
     std::vector<ParticleData> particles = Util::loadParticleData(inputFile);
