@@ -35,8 +35,15 @@ void plotBetaComparison(std::string fileName = "test.root",
     TFile *file = TFile::Open(fileName.c_str(), "READ");
     if (!file || file->IsZombie())
     {
-        std::cerr << "Error: Could not open file " << fileName << std::endl;
-        return;
+        std::string resultsPath = "results/" + fileName;
+        std::cout << "Try to open file: " << resultsPath << std::endl;
+
+        file = TFile::Open(resultsPath.c_str(), "READ");
+        if (!file || file->IsZombie())
+        {
+            std::cerr << "Error: Unable to open file " << fileName << " or " << resultsPath << std::endl;
+            return;
+        }
     }
 
     // Get the beta reconstruction tree
