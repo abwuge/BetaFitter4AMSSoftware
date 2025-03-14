@@ -14,7 +14,7 @@ int main(int argc, char **argv)
 {
     if (argc < 3)
     {
-        std::cout << "Usage: " << argv[0] << " <inputFile.root> <outputFile.root> [<fitOption>]" << std::endl;
+        std::cout << "Usage: " << argv[0] << " <inputFile.root> <outputFile.root> [<fitOption>] [<energyLossScale>]" << std::endl;
         std::cout << "fitOption: " << std::endl;
         std::cout << "  -2: Save energy loss information to ROOT file" << std::endl;
         std::cout << "  -1: Save magnetic field information to ROOT file" << std::endl;

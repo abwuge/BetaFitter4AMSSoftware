@@ -16,7 +16,7 @@
  * Draw energy loss distributions from a ROOT file containing energyLoss tree
  *
  * @param fileName Path to the input ROOT file
- * @param outputName Output file name (default: energy_loss_plots.pdf)
+ * @param outputName Output file name
  */
 void plotEnergyLoss(std::string fileName = "test.root",
                     const char *outputName = "test_energy_loss_plots.pdf")
