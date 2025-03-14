@@ -76,7 +76,7 @@ if [ ! -f "$README_FILE" ]; then
 fi
 
 # Append run information to README.md
-echo "[${TIMESTAMP}] FILE = ${HADD_FILE}: Z = ${Z}, fitOption = ${fitOption}, energyLossScale = ${energyLossScale}, MAX_PROCS = ${MAX_PROCS}" >> "$README_FILE"
-echo "Run information has been added to ${README_FILE}"
+echo "[${TIMESTAMP}] FILE = ${HADD_FILE}: Z = ${Z}, fitOption = ${fitOption}, energyLossScale = ${energyLossScale}, MAX_PROCS = ${MAX_PROCS}  " >> "$README_FILE"
+echo "Run information has been added to ${README_FILE}."
 
 echo "All jobs completed!"

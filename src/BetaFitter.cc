@@ -78,8 +78,8 @@ double BetaFitter::reconstructBeta(const ParticleData *particle,
     minimizer->SetFunction(functor);
 
     // Set parameter limits and initial values
-    double lowerLimit = 1.0 + 1e-4;  // beta < 1
-    double upperLimit = 10.0 - 1e-4; // beta > 0.1
+    double lowerLimit = 1.0 + 1e-10;  // beta < 1
+    double upperLimit = 10.0; // beta > 0.1
     initialBetaRecip = TMath::Range(lowerLimit, upperLimit, initialBetaRecip);
     minimizer->SetLimitedVariable(0, "betaReciprocal", initialBetaRecip, 1e-5, lowerLimit, upperLimit);
 

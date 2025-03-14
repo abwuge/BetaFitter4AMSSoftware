@@ -11,6 +11,101 @@
 #include <TMath.h>
 #include <TROOT.h>
 #include <iostream>
+#include <fstream>
+#include <vector>
+
+/**
+ * Get Z value and energyLossScale for a file from README.md
+ * @param fileName Name of the ROOT file
+ * @return pair of Z value and energyLossScale. Returns {-1, -1} if not found
+ */
+std::pair<int, double> getParamsFromReadme(const std::string &fileName)
+{
+    std::ifstream readme("results/README.md");
+    if (!readme)
+    {
+        std::cerr << "Error: Could not open results/README.md" << std::endl;
+        return {-1, -1};
+    }
+
+    std::string line;
+    std::string targetFile = fileName;
+    // If fileName starts with "results/", remove it
+    if (targetFile.substr(0, 8) == "results/")
+    {
+        targetFile = targetFile.substr(8);
+    }
+    else
+    {
+        std::cerr << "Warning: File name does not start with 'results/'"
+                  << "\nCannot find the file in README.md" << std::endl;
+        return {-1, -1};
+    }
+
+    int latestZ = -1;
+    double energyLossScale = -1.0;
+    // Read file from bottom to top to get the latest entry
+    std::vector<std::string> lines;
+    while (std::getline(readme, line))
+    {
+        lines.push_back(line);
+    }
+
+    // Search from the end to find the latest matching entry
+    for (auto it = lines.rbegin(); it != lines.rend(); ++it)
+    {
+        size_t filePos = it->find("FILE = " + targetFile);
+        if (filePos != std::string::npos)
+        {
+            // Get Z value
+            size_t zPos = it->find("Z = ", filePos);
+            if (zPos != std::string::npos)
+            {
+                zPos += 4; // Skip "Z = "
+                size_t commaPos = it->find(",", zPos);
+                if (commaPos != std::string::npos)
+                {
+                    std::string zStr = it->substr(zPos, commaPos - zPos);
+                    try
+                    {
+                        latestZ = std::stoi(zStr);
+                    }
+                    catch (...)
+                    {
+                        continue;
+                    }
+                }
+            }
+
+            // Get energyLossScale value
+            size_t scalePos = it->find("energyLossScale = ", filePos);
+            if (scalePos != std::string::npos)
+            {
+                scalePos += 17; // Skip "energyLossScale = "
+                size_t commaPos = it->find(",", scalePos);
+                if (commaPos != std::string::npos)
+                {
+                    std::string scaleStr = it->substr(scalePos, commaPos - scalePos);
+                    try
+                    {
+                        energyLossScale = std::stod(scaleStr);
+                    }
+                    catch (...)
+                    {
+                        continue;
+                    }
+                }
+            }
+
+            if (latestZ > 0 && energyLossScale > 0)
+            {
+                break;
+            }
+        }
+    }
+
+    return {latestZ, energyLossScale};
+}
 
 /**
  * Draw beta comparison plots from a ROOT file containing betaTree
@@ -35,13 +130,13 @@ void plotBetaComparison(std::string fileName = "test.root",
     TFile *file = TFile::Open(fileName.c_str(), "READ");
     if (!file || file->IsZombie())
     {
-        std::string resultsPath = "results/" + fileName;
-        std::cout << "Try to open file: " << resultsPath << std::endl;
+        fileName = "results/" + fileName;
+        std::cout << "Try to open file: " << fileName << std::endl;
 
-        file = TFile::Open(resultsPath.c_str(), "READ");
+        file = TFile::Open(fileName.c_str(), "READ");
         if (!file || file->IsZombie())
         {
-            std::cerr << "Error: Unable to open file " << fileName << " or " << resultsPath << std::endl;
+            std::cerr << "Error: Unable to find/open file " << fileName << std::endl;
             return;
         }
     }
@@ -82,33 +177,57 @@ void plotBetaComparison(std::string fileName = "test.root",
     int nBinsY = 100;                          // Number of bins in y direction for the residual plot
     double xMin = mcBetaMin, xMax = mcBetaMax; // Range for the beta values
 
-    double yMinRes = -0.2, yMaxRes = 1.2;
+    // Helper function to get range using quantiles
+    auto getQuantileRange = [&tree](const char *branchName, double lowQuantile = 0.01, double highQuantile = 0.99) -> std::pair<double, double>
+    {
+        // Create a high-precision temporary histogram with reasonable initial range
+        TH1D hTemp(Form("hTemp_%s", branchName), "", 10000, -1, 1);
 
-    // Create histograms for the residuals plot (1/beta_rec - 1/beta_mc)
+        // Use TFormula for efficient calculation
+        TString formula = TString::Format("1/%s - 1/mcBeta", branchName);
+        tree->Draw(Form("%s>>hTemp_%s", formula.Data(), branchName), "", "goff");
+
+        // Calculate quantiles
+        Double_t xq[2] = {lowQuantile, highQuantile};
+        Double_t yq[2] = {0, 0};
+        hTemp.GetQuantiles(2, yq, xq);
+
+        std::cout << "Range for " << branchName << " residuals using quantiles: [" << yq[0] << ", " << yq[1] << "]" << std::endl;
+        return std::make_pair(yq[0], yq[1]);
+    };
+
+    // Get ranges for residuals using quantiles
+    auto nonlinearResRange = getQuantileRange("nonlinearBeta", 1e-4, 1 - 1e-4);
+    auto linearResRange = getQuantileRange("linearBeta", 1e-4, 1 - 1e-6);
+
+    // Use independent ranges for first two pages
+    double yMinResNL = nonlinearResRange.first;
+    double yMaxResNL = nonlinearResRange.second;
+
+    double yMinResL = linearResRange.first;
+    double yMaxResL = linearResRange.second;
+
+    // Use the wider range for the comparison page
+    double yMinRes = std::min(nonlinearResRange.first, linearResRange.first);
+    double yMaxRes = std::max(nonlinearResRange.second, linearResRange.second);
+    double margin = 0.05 * (yMaxRes - yMinRes);
+    yMinRes -= margin;
+    yMaxRes += margin;
+
+    // Create histograms for the residuals plot with independent ranges
     TH2F *hNonlinearResVsMC = new TH2F("hNonlinearResVsMC",
                                        "Non-linear Reconstruction Residuals;#beta_{MC};1/#beta_{non-linear} - 1/#beta_{MC}",
-                                       nBinsX, xMin, xMax, nBinsY, yMinRes, yMaxRes);
+                                       nBinsX, xMin, xMax, nBinsY, yMinResNL, yMaxResNL);
     TH2F *hLinearResVsMC = new TH2F("hLinearResVsMC",
                                     "Linear Reconstruction Residuals;#beta_{MC};1/#beta_{linear} - 1/#beta_{MC}",
-                                    nBinsX, xMin, xMax, nBinsY, yMinRes, yMaxRes);
+                                    nBinsX, xMin, xMax, nBinsY, yMinResL, yMaxResL);
 
     hNonlinearResVsMC->SetMinimum(1);
     hLinearResVsMC->SetMinimum(1);
 
-    // Fill histograms
-    Long64_t nEntries = tree->GetEntries();
-    for (Long64_t i = 0; i < nEntries; ++i)
-    {
-        tree->GetEntry(i);
-
-        // Calculate residuals
-        double nonlinearRes = (1.0 / nonlinearBeta) - (1.0 / mcBeta);
-        double linearRes = (1.0 / linearBeta) - (1.0 / mcBeta);
-
-        // Fill histograms with residual values
-        hNonlinearResVsMC->Fill(mcBeta, nonlinearRes);
-        hLinearResVsMC->Fill(mcBeta, linearRes);
-    }
+    // Fill 2D histograms efficiently using TFormula
+    tree->Draw("1/nonlinearBeta - 1/mcBeta:mcBeta>>hNonlinearResVsMC", "", "goff");
+    tree->Draw("1/linearBeta - 1/mcBeta:mcBeta>>hLinearResVsMC", "", "goff");
 
     // Arrays to store fit results and weights
     const int nProfiles = nBinsX;
@@ -277,30 +396,31 @@ void plotBetaComparison(std::string fileName = "test.root",
     grNonlinear->SetLineColor(kBlue);
     grNonlinear->SetMarkerSize(3.0);
 
-    // Set point weights for fitting
+    grNonlinear->Draw("LEP");
+    grLinear->Draw("LEP");
+
+    // Then update errors with weights for fitting only
+    TGraphErrors *grNonlinearFit = (TGraphErrors *)grNonlinear->Clone("grNonlinearFit");
     for (int i = 0; i < nProfiles; i++)
-    {
-        grNonlinear->SetPointError(i, 0, nonlinearError[i]);
         if (nonlinearWeight[i] > 0)
-            grNonlinear->SetPointError(i, 0, nonlinearError[i] / sqrt(nonlinearWeight[i]));
-    }
-    grNonlinear->Fit(fNonlinear, "QR"); // Q for quiet, R for using range
-    grNonlinear->Draw("LP");
+            grNonlinearFit->SetPointError(i, 0, nonlinearError[i] / sqrt(nonlinearWeight[i]));
+
+    grNonlinearFit->Fit(fNonlinear, "NQR"); // Q for quiet, R for using range
+    fNonlinear->Draw("SAME");
 
     grLinear->SetMarkerStyle(21);
     grLinear->SetMarkerColor(kRed);
     grLinear->SetLineColor(kRed);
     grLinear->SetMarkerSize(3.0);
 
-    // Set point weights for fitting
+    // First draw points with original error bars
+    TGraphErrors *grLinearFit = (TGraphErrors *)grLinear->Clone("grLinearFit");
     for (int i = 0; i < nProfiles; i++)
-    {
-        grLinear->SetPointError(i, 0, linearError[i]);
         if (linearWeight[i] > 0)
-            grLinear->SetPointError(i, 0, linearError[i] / sqrt(linearWeight[i]));
-    }
-    grLinear->Fit(fLinear, "QR");
-    grLinear->Draw("LP");
+            grLinearFit->SetPointError(i, 0, linearError[i] / sqrt(linearWeight[i]));
+
+    grLinearFit->Fit(fLinear, "NQR");
+    fLinear->Draw("SAME");
 
     // Add legend with fit equations
     TLegend *legend = new TLegend(0.45, 0.65, 0.85, 0.85);
@@ -323,30 +443,34 @@ void plotBetaComparison(std::string fileName = "test.root",
     zeroLine->SetLineColor(kGray + 2);
     zeroLine->Draw("SAME");
 
+    // Get Z value and energyLossScale from the file
+    auto params = getParamsFromReadme(fileName);
+    int zValue = params.first;
+    double energyLossScale = params.second;
+
+    // Add Z value and energyLossScale at the top center if available
+    TPaveText *infoText = nullptr;
+    if (zValue > 0)
+    {
+        infoText = new TPaveText(0.2, 0.92, 0.8, 0.98, "NDC");
+        infoText->SetFillColor(0);
+        infoText->SetBorderSize(0);
+        infoText->AddText(Form("Z = %d, Energy Loss Scale = %.1f", zValue, energyLossScale));
+        infoText->Draw();
+    }
+
     c3->Print(outputName);
     c3->Print(Form("%s]", outputName)); // Close PDF file
 
     // Clean up
+    if (zValue > 0)
+    {
+        delete infoText;
+    }
     delete zeroLine;
-    delete legend;
-    delete hFrame;
-    delete c3;
-    delete grNonlinear;
-    delete grLinear;
-    delete perfectLine1;
-    delete perfectLine2;
-    delete c2;
-    delete c1;
-    delete hNonlinearResVsMC;
-    delete hLinearResVsMC;
-    delete canvas;
-
-    // Reset tree branches to avoid dangling pointers
-    tree->ResetBranchAddresses();
 
     // Close and delete the file after all references are gone
     file->Close();
-    delete file;
 
     std::cout << "Beta residuals comparison plot saved to: " << outputName << std::endl;
 }
