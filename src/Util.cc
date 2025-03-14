@@ -215,6 +215,8 @@ bool Util::saveMagneticField(const std::string &outputFile)
     outFile->Close();
     delete outFile;
 
+    std::cout << "Magnetic field data saved to " << outputFile << std::endl;
+
     return true;
 }
 
@@ -362,9 +364,20 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
         treeOut->Fill();
     }
 
+    if (treeOut->GetEntries() == 0)
+    {
+        std::cerr << "Error: No valid data saved to " << outputFile << std::endl;
+        fileOut->Close();
+        return false;
+    }
+
     treeOut->Write();
     fileOut->Close();
 
     fileIn->Close();
+
+    std::cout << "Energy loss information saved to " << outputFile << std::endl;
+    std::cout << "Total entries: " << treeOut->GetEntries() << std::endl;
+
     return true;
 }

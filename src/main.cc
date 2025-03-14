@@ -37,6 +37,16 @@ int main(int argc, char **argv)
      */
     BetaFitter::fitOption = argc > 3 ? atoi(argv[3]) : 0;
 
+    double els = argc > 4 ? atof(argv[4]) : 2;
+    if (els < 1)
+        els = 2;
+
+    std::cout << "\nInput file: " << inputFile
+        << "\nOutput file: " << outputFile
+        << "\nFit option: " << BetaFitter::fitOption
+        << "\nEnergy loss scale: " << els
+        << "\n" << std::endl;
+
     // Handle energy loss information saving
     if (BetaFitter::fitOption == -2)
         return Util::saveEnergyLoss(inputFile, outputFile) ? 0 : 1;
@@ -48,10 +58,6 @@ int main(int argc, char **argv)
     // Normal beta reconstruction workflow
     if (BetaFitter::fitOption < 0 || BetaFitter::fitOption > 2)
         BetaFitter::fitOption = 0;
-
-    double els = argc > 4 ? atof(argv[4]) : 2;
-    if (els < 1)
-        els = 2;
 
     // Load particle data from input file
     std::vector<ParticleData> particles = Util::loadParticleData(inputFile);
