@@ -65,4 +65,18 @@ else
     echo "Skipping hadd operation."
 fi
 
+# Add information to README.md
+README_FILE="${RESULTS_DIR}/README.md"
+TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+HADD_FILE="${RUN_NUM}.root"
+
+# Create README.md if it doesn't exist
+if [ ! -f "$README_FILE" ]; then
+    echo "# Running Parameters Log" > "$README_FILE"
+fi
+
+# Append run information to README.md
+echo "[${TIMESTAMP}] FILE = ${HADD_FILE}: Z = ${Z}, fitOption = ${fitOption}, energyLossScale = ${energyLossScale}, MAX_PROCS = ${MAX_PROCS}" >> "$README_FILE"
+echo "Run information has been added to ${README_FILE}"
+
 echo "All jobs completed!"
