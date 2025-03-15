@@ -1,5 +1,23 @@
 #!/bin/bash
 
+# Array to store child PIDs
+declare -a CHILD_PIDS
+
+# Function to cleanup child processes
+cleanup() {
+    echo -e "\nReceived termination signal. Cleaning up..."
+    # Kill all child processes
+    for pid in "${CHILD_PIDS[@]}"; do
+        if kill -0 $pid 2>/dev/null; then
+            kill $pid 2>/dev/null
+        fi
+    done
+    exit 1
+}
+
+# Set up signal handlers
+trap cleanup SIGINT SIGTERM
+
 # Default maximum number of parallel processes
 Z=${1:-8}
 fitOption=${2:-0}
@@ -50,6 +68,9 @@ while IFS= read -r input_file; do
     
     # Run the process in background
     ("${SCRIPT_DIR}/run.csh" "$input_file" "$output_file" "$fitOption" "$energyLossScale" > "$log_file" 2>&1) &
+    
+    # Store the PID of the background process
+    CHILD_PIDS+=($!)
     
     echo "Started processing: $input_file"
 done < "$INPUT_LIST"
