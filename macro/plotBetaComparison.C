@@ -195,14 +195,21 @@ void plotBetaComparison(std::string fileName = "test.root",
     double xMin = mcBetaMin, xMax = mcBetaMax; // Range for the beta values
 
     // Helper function to get range using quantiles
-    auto getQuantileRange = [&tree](const char *branchName, double lowQuantile = 0.01, double highQuantile = 0.99) -> std::pair<double, double>
+    auto getQuantileRange = [&tree](const char *branchName, double lowQuantile = 0.01, double highQuantile = 0.99, bool diff = true) -> std::pair<double, double>
     {
         // Create a high-precision temporary histogram with reasonable initial range
-        TH1D hTemp(Form("hTemp_%s", branchName), "", 10000, -1, 1);
+        TH1D hTemp(Form("hTemp_%s", branchName), "", 10000, 0, 0);
 
         // Use TFormula for efficient calculation
-        TString formula = TString::Format("1/%s - 1/mcBeta", branchName);
-        tree->Draw(Form("%s>>hTemp_%s", formula.Data(), branchName), "", "goff");
+        if (diff)
+        {
+            TString formula = TString::Format("1/%s - 1/mcBeta", branchName);
+            tree->Draw(Form("%s>>hTemp_%s", formula.Data(), branchName), "", "goff");
+        }
+        else
+        {
+            tree->Draw(Form("%s>>hTemp_%s", branchName, branchName), "", "goff");
+        }
 
         // Calculate quantiles
         Double_t xq[2] = {lowQuantile, highQuantile};
@@ -215,7 +222,7 @@ void plotBetaComparison(std::string fileName = "test.root",
 
     // Get ranges for residuals using quantiles
     auto nonlinearResRange = getQuantileRange("nonlinearBeta", 1e-4, 1 - 1e-4);
-    auto linearResRange = getQuantileRange("linearBeta", 1e-4, 1 - 1e-6);
+    auto linearResRange = getQuantileRange("linearBeta", 0.001, 1 - 1e-6);
 
     // Use independent ranges for first two pages
     double yMinResNL = nonlinearResRange.first;
@@ -227,9 +234,6 @@ void plotBetaComparison(std::string fileName = "test.root",
     // Use the wider range for the comparison page
     double yMinRes = std::min(nonlinearResRange.first, linearResRange.first);
     double yMaxRes = std::max(nonlinearResRange.second, linearResRange.second);
-    double margin = 0.05 * (yMaxRes - yMinRes);
-    yMinRes -= margin;
-    yMaxRes += margin;
 
     // Create histograms for the residuals plot with independent ranges
     TH2F *hNonlinearResVsMC = new TH2F("hNonlinearResVsMC",
@@ -246,6 +250,86 @@ void plotBetaComparison(std::string fileName = "test.root",
     tree->Draw("1/nonlinearBeta - 1/mcBeta:mcBeta>>hNonlinearResVsMC", "", "goff");
     tree->Draw("1/linearBeta - 1/mcBeta:mcBeta>>hLinearResVsMC", "", "goff");
 
+    auto nonlinearBetaRange = getQuantileRange("nonlinearBeta", 1e-4, 1 - 1e-4, false);
+    double yMinNL = nonlinearBetaRange.first;
+    double yMaxNL = nonlinearBetaRange.second;
+
+    auto linearBetaRange = getQuantileRange("linearBeta", 1e-4, 0.99, false);
+    double yMinL = linearBetaRange.first;
+    double yMaxL = linearBetaRange.second;
+
+    // Create 2D histograms for beta comparison
+    TH2F *hNonlinearVsMC = new TH2F("hNonlinearVsMC",
+                                    "Non-linear Beta vs MC Beta;#beta_{MC};#beta_{non-linear}",
+                                    100, mcBetaMin, mcBetaMax, 100, yMinNL, yMaxNL);
+    TH2F *hLinearVsMC = new TH2F("hLinearVsMC",
+                                 "Linear Beta vs MC Beta;#beta_{MC};#beta_{linear}",
+                                 100, mcBetaMin, mcBetaMax, 100, yMinL, yMaxL);
+
+    // Fill beta comparison histograms
+    tree->Draw("nonlinearBeta:mcBeta>>hNonlinearVsMC", "", "goff");
+    tree->Draw("linearBeta:mcBeta>>hLinearVsMC", "", "goff");
+
+    // Create canvas for beta comparison plots
+    TCanvas *cBetaComp1 = new TCanvas("cBetaComp1", "Non-linear Beta vs MC Beta", 3508, 2480);
+    cBetaComp1->SetLeftMargin(0.16);
+    cBetaComp1->SetRightMargin(0.11);
+    cBetaComp1->SetGridx();
+    cBetaComp1->SetGridy();
+    cBetaComp1->SetLogz();
+
+    hNonlinearVsMC->Draw("COLZ");
+
+    // Draw perfect correlation line
+    TF1 *perfect1 = new TF1("perfect1", "x", mcBetaMin, mcBetaMax);
+    perfect1->SetLineColor(kRed);
+    perfect1->SetLineStyle(2);
+    perfect1->Draw("SAME");
+
+    // Add Z value and energyLossScale at the top if available
+    TPaveText *infoText1 = nullptr;
+    if (zValue > 0)
+    {
+        infoText1 = new TPaveText(0.2, 0.92, 0.8, 0.98, "NDC");
+        infoText1->SetFillColor(0);
+        infoText1->SetBorderSize(0);
+        infoText1->AddText(Form("Z = %d, Energy Loss Scale = %.1f", zValue, energyLossScale));
+        infoText1->Draw();
+    }
+
+    TCanvas *canvas = new TCanvas("canvas", "Beta Residuals Comparison", 3508, 2480);
+    canvas->Print(Form("%s[", outputName)); // Open PDF file
+    cBetaComp1->Print(outputName);
+
+    // Second page - Linear beta comparison
+    TCanvas *cBetaComp2 = new TCanvas("cBetaComp2", "Linear Beta vs MC Beta", 3508, 2480);
+    cBetaComp2->SetLeftMargin(0.16);
+    cBetaComp2->SetRightMargin(0.11);
+    cBetaComp2->SetGridx();
+    cBetaComp2->SetGridy();
+    cBetaComp2->SetLogz();
+
+    hLinearVsMC->Draw("COLZ");
+
+    // Draw perfect correlation line
+    TF1 *perfect2 = new TF1("perfect2", "x", mcBetaMin, mcBetaMax);
+    perfect2->SetLineColor(kRed);
+    perfect2->SetLineStyle(2);
+    perfect2->Draw("SAME");
+
+    // Add Z value and energyLossScale at the top if available
+    TPaveText *infoText2 = nullptr;
+    if (zValue > 0)
+    {
+        infoText2 = new TPaveText(0.2, 0.92, 0.8, 0.98, "NDC");
+        infoText2->SetFillColor(0);
+        infoText2->SetBorderSize(0);
+        infoText2->AddText(Form("Z = %d, Energy Loss Scale = %.1f", zValue, energyLossScale));
+        infoText2->Draw();
+    }
+
+    cBetaComp2->Print(outputName);
+
     // Arrays to store fit results and weights
     const int nProfiles = nBinsX;
     double mcBetaValues[nProfiles];
@@ -258,7 +342,7 @@ void plotBetaComparison(std::string fileName = "test.root",
     std::cout << std::string(65, '-') << std::endl;
 
     double binWidth = (xMax - xMin) / nBinsX;
-    for (int bin = 0; bin < nBinsX; ++bin)
+    for (int bin = 0; bin < nProfiles; ++bin)
     {
         double binCenter = xMin + (bin + 0.5) * binWidth;
         int binIdx = bin + 1; // ROOT histograms are 1-indexed
@@ -332,10 +416,6 @@ void plotBetaComparison(std::string fileName = "test.root",
     }
 
     // Create canvas with multiple pages
-    TCanvas *canvas = new TCanvas("canvas", "Beta Residuals Comparison", 3508, 2480);
-    canvas->Print(Form("%s[", outputName)); // Open PDF file
-
-    // First page - Non-linear beta residuals
     TCanvas *c1 = new TCanvas("c1", "Non-linear Beta Residuals", 3508, 2480);
     c1->SetLeftMargin(0.16);
     c1->SetRightMargin(0.11);
