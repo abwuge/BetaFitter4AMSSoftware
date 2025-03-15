@@ -5,7 +5,7 @@
 #include <vector>
 #include "amschain.h"
 #include "ParticleData.hh"
-#include "BetaNL.hh"
+#include "BetaNL.h"
 #include <TCanvas.h>
 #include <TGraph.h>
 #include <TView.h>
@@ -60,6 +60,15 @@ namespace Util
      * @return bool True if calculation succeeds, false otherwise
      */
     bool saveEnergyLoss(const std::string &inputFile, const std::string &outputFile);
+
+    /**
+     * @brief Calculate energy loss scale factor
+     *
+     * @param inputFile Path to the ROOT file containing particle data
+     * @param outputFile Path to save the ROOT file containing energy loss scale factor
+     * @return bool True if calculation succeeds, false otherwise
+     */
+    bool saveEnergyLossScale(const std::string &inputFile, const std::string &outputFile);
 }
 
 #endif // __UTIL_HH__

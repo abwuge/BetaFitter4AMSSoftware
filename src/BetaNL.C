@@ -135,9 +135,12 @@ std::vector<double> BetaNL::propagate(const double beta) const
     return hitTimes;
 }
 
-double BetaNL::betaChi2(const double *invBeta) const
+double BetaNL::betaChi2(const double *params) const
 {
-    const double *const hitTimeReconstructed = propagate(1 / invBeta[0]).data();
+    const double invBeta = params[0];
+    const double timeOffset = params[1];
+
+    const double *const hitTimeReconstructed = propagate(1 / invBeta).data();
     const double *const hitTimeMeasured = _pars->_hitTime.data();
     const double *const hitTimeError = _pars->_hitTimeError.data();
 
@@ -146,7 +149,7 @@ double BetaNL::betaChi2(const double *invBeta) const
     {
         if (hitTimeMeasured[i] == -1)
             continue;
-        double dt = hitTimeReconstructed[i] - hitTimeMeasured[i];
+        double dt = hitTimeReconstructed[i] - (hitTimeMeasured[i] - timeOffset);
         double sigma = hitTimeError[i];
         chi2 += (dt * dt) / (sigma * sigma);
     }
@@ -181,16 +184,24 @@ double BetaNL::reconstruct()
 
     ROOT::Math::Minimizer *minimizer = ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad");
 
-    ROOT::Math::Functor functor(this, &BetaNL::betaChi2, 1);
+    ROOT::Math::Functor functor(this, &BetaNL::betaChi2, 2);
     minimizer->SetFunction(functor);
 
-    double lowerLimit = 1 + 1e-10; // beta < 1
-    double upperLimit = 3;         // beta > 0.33
-    double initialInvBeta = TMath::Range(lowerLimit, upperLimit, 1 / _pars->_beta);
-    minimizer->SetLimitedVariable(0, "invBeta", initialInvBeta, 1e-5, lowerLimit, upperLimit);
+    double lowerInvBeta = 1 + 1e-10; // beta < 1
+    double upperInvBeta = 3;         // beta > 0.33
+    double initialInvBeta = TMath::Range(lowerInvBeta, upperInvBeta, 1 / _pars->_beta);
+    minimizer->SetLimitedVariable(0, "invBeta", initialInvBeta, 1e-5, lowerInvBeta, upperInvBeta);
+
+    double timeError = _pars->_hitTimeError[0];
+    double initialTimeOffset = _pars->_hitTime[0];
+    double lowerTimeOffset = initialTimeOffset - 5 * timeError;
+    double upperTimeOffset = initialTimeOffset + 5 * timeError;
+    minimizer->SetLimitedVariable(1, "timeOffset", initialTimeOffset, 0.1 * timeError, lowerTimeOffset, upperTimeOffset);
 
     minimizer->Minimize();
 
     _invBeta = std::make_shared<double>(minimizer->X()[0]);
+    _timeOffset = minimizer->X()[1];
+
     return *_invBeta;
 }

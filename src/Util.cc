@@ -115,12 +115,11 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
         data.initDir[1] = tof_dir[0][1];
         data.initDir[2] = tof_dir[0][2];
 
-        float minTime = *std::min_element(tof_tl, tof_tl + 4);
         for (int j = 0; j < ParticleData::TOF_MAX_HITS; ++j)
         {
             // TODO: this position might not be correct
             data.TOF_hitZ[j] = tof_pos[j][2];
-            data.TOF_hitTime[j] = tof_tl[j] == -1 ? -1 : tof_tl[j] - minTime;
+            data.TOF_hitTime[j] = tof_tl[j];
             // TODO: SO FAR it's constant, but it might not be correct
             data.TOF_hitTimeError[j] = 0.1544809;
             data.TOF_hitEdep[j] = tof_edep[j] * 1e-3;
@@ -416,6 +415,79 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
 
     fileOut->Close();
     fileIn->Close();
+
+    return true;
+}
+
+bool Util::saveEnergyLossScale(const std::string &inputFile, const std::string &outputFile)
+{
+    // Load particle data from input file
+    std::vector<ParticleData> particles = Util::loadParticleData(inputFile);
+    if (particles.empty())
+    {
+        std::cerr << "Error: No particles loaded from input file" << std::endl;
+        return false;
+    }
+
+    // Create output ROOT file
+    TFile *outFile = new TFile(outputFile.c_str(), "RECREATE");
+    if (!outFile || outFile->IsZombie())
+    {
+        std::cerr << "Error: Could not create output file" << std::endl;
+        return 1;
+    }
+
+    // Create TTree
+    TTree *tree = new TTree("scaleTree", "Energy Loss Scale Factor");
+    
+    float energyLossScale;
+    float mcBeta;
+    float position[3];
+    float direction[3];
+
+    tree->Branch("energyLossScale", &energyLossScale, "energyLossScale/F");
+    tree->Branch("mcBeta", &mcBeta, "mcBeta/F");
+    tree->Branch("position", position, "position[3]/F");
+    tree->Branch("direction", direction, "direction[3]/F");
+
+    for (const auto &particle : particles)
+    {
+        // Skip invalid particles
+        if (!particle.isMC)
+            continue;
+
+        if (particle.mcInitCoo[0] == -1000)
+            continue;
+
+        // Get energy loss scale factor
+        energyLossScale = BetaNL(
+                             BetaNLPars(
+                                 AMSPoint(particle.initCoo[0], particle.initCoo[1], particle.initCoo[2]),
+                                 AMSDir(particle.initDir[0], particle.initDir[1], particle.initDir[2]),
+                                 particle.betaLinear,
+                                 particle.mass,
+                                 particle.charge,
+                                 particle.TOF_hitZ,
+                                 particle.TOF_hitEdep,
+                                 particle.TOF_hitTime,
+                                 particle.TOF_hitTimeError))
+                             .EnergyLossScale(particle.mcBeta);
+        mcBeta = particle.mcBeta;
+        position[0] = particle.initCoo[0];
+        position[1] = particle.initCoo[1];
+        position[2] = particle.initCoo[2];
+        direction[0] = particle.initDir[0];
+        direction[1] = particle.initDir[1];
+        direction[2] = particle.initDir[2];
+
+        // Fill tree
+        tree->Fill();
+    }
+
+    // Write and close
+    tree->Write();
+    outFile->Close();
+    delete outFile;
 
     return true;
 }

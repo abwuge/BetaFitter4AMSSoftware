@@ -1,14 +1,6 @@
 #include <iostream>
-#include <string>
-#include <vector>
 
-#include "TFile.h"
-#include "TTree.h"
-
-#include "BetaNL.hh"
 #include "Util.hh"
-#include "BetaFitter.hh"
-#include "ParticlePropagator.hh"
 
 int main(int argc, char **argv)
 {
@@ -19,6 +11,7 @@ int main(int argc, char **argv)
         std::cout << "  -2: Save energy loss information to ROOT file" << std::endl;
         std::cout << "  -1: Save magnetic field information to ROOT file" << std::endl;
         std::cout << "   0: Save beta information to ROOT file" << std::endl;
+        std::cout << "   1: Save energy loss scacle information to ROOT file" << std::endl;
         return 1;
     }
 
@@ -42,6 +35,8 @@ int main(int argc, char **argv)
         return Util::saveMagneticField(outputFile) ? 0 : 1;
     case 0:
         return Util::saveBeta(inputFile, outputFile, energyLossScale) ? 0 : 1;
+    case 1:
+        return Util::saveEnergyLossScale(inputFile, outputFile) ? 0 : 1;
     default:
         std::cerr << "Error: Invalid option " << Option << std::endl;
         return 1;
