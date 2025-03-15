@@ -5,6 +5,7 @@
 #include <vector>
 #include "amschain.h"
 #include "ParticleData.hh"
+#include "BetaNL.hh"
 #include <TCanvas.h>
 #include <TGraph.h>
 #include <TView.h>
@@ -60,6 +61,14 @@ namespace Util
      * @return bool True if calculation succeeds, false otherwise
      */
     bool saveEnergyLoss(const std::string &inputFile, const std::string &outputFile);
+
+    /**
+     * @brief Convert ParticleData to BetaNLPars
+     * 
+     * @param particle Particle data to convert
+     * @return BetaNLPars Parameters for beta non-linear reconstruction
+     */
+    BetaNLPars convertToBetaNLPars(const ParticleData &particle);
 }
 
 #endif // __UTIL_HH__

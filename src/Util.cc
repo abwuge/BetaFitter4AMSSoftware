@@ -376,3 +376,43 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
 
     return true;
 }
+
+/**
+ * Implementation of convertToBetaNLPars function
+ * Converts ParticleData to BetaNLPars for beta non-linear reconstruction
+ */
+BetaNLPars Util::convertToBetaNLPars(const ParticleData &particle)
+{
+    // Create direction object from particle direction
+    AMSDir direction(particle.initDir[0], particle.initDir[1], particle.initDir[2]);
+    
+    // Create position object from particle position
+    AMSPoint position(particle.initCoo[0], particle.initCoo[1], particle.initCoo[2]);
+    
+    // Get initial beta value from particle
+    double beta = particle.betaLinear;
+    
+    // Get mass and charge values
+    double mass = particle.mass;
+    int charge = particle.charge;
+    
+    // Collect TOF hit data from particle
+    std::vector<double> zTOF;
+    std::vector<double> energyDeposited;
+    std::vector<double> hitTime;
+    std::vector<double> hitTimeError;
+    
+    // Add valid TOF hits to vectors
+    for (int i = 0; i < ParticleData::TOF_MAX_HITS; ++i) {
+        if (particle.TOF_hitZ[i] != 0 || particle.TOF_hitTime[i] >= 0) {
+            zTOF.push_back(particle.TOF_hitZ[i]);
+            energyDeposited.push_back(particle.TOF_hitEdep[i]); // Energy deposited in GeV
+            hitTime.push_back(particle.TOF_hitTime[i]);
+            hitTimeError.push_back(particle.TOF_hitTimeError[i]);
+        }
+    }
+    
+    // Create BetaNLPars object with collected data
+    return BetaNLPars(direction, position, beta, mass, charge, 
+                      zTOF, energyDeposited, hitTime, hitTimeError);
+}

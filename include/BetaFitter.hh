@@ -12,7 +12,6 @@ class BetaFitter
 {
 public:
     // TOF time resolution (ns)
-    static constexpr double TOF_TIME_RESOLUTION[4] = {0.1, 0.1, 0.1, 0.1};
     static int fitOption;
 
     /**

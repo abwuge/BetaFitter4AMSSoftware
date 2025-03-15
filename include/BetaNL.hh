@@ -1,0 +1,206 @@
+#ifndef __BETANL_HH__
+#define __BETANL_HH__
+
+#include <TMath.h>
+
+#include "TrFit.h"
+
+class BetaNLPars
+{
+public:
+    static constexpr size_t nTOF = 4;                    // Number of TOF hits
+    static constexpr double SPEED_OF_LIGHT = 29.9792458; // Speed of light in cm/ns
+
+public:
+    // Constructors & Destructors
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Default constructor
+     * @note Default values:
+     * - Position: (0, 0, 0)
+     * - Direction: (0, 0, 1)
+     * - Beta: 0.8
+     * - Mass: 0.938 GeV/c^2
+     * - Charge: 1
+     */
+    BetaNLPars() {};
+
+    /**
+     * Constructor with parameters
+     * @param pos Initial position of the particle
+     * @param dir Initial direction of the particle
+     * @param beta Initial beta of the particle
+     * @param mass Mass of the particle (GeV/c^2)
+     * @param charge Charge of the particle (must not be 0)
+     * @param zTOF Z positions of TOF hits
+     * @param energyDeposited Energy deposited at TOF hits
+     * @param hitTime Hit times at TOF hits
+     * @param hitTimeError Hit time errors at TOF hits
+     */
+    BetaNLPars(
+        AMSPoint pos,
+        AMSDir dir,
+        double beta,
+        double mass,
+        int charge,
+        std::vector<double> zTOF,
+        std::vector<double> energyDeposited,
+        std::vector<double> hitTime,
+        std::vector<double> hitTimeError);
+
+    /**
+     * Constructor with parameters
+     * @param pos Initial position of the particle
+     * @param dir Initial direction of the particle
+     * @param beta Initial beta of the particle
+     * @param mass Mass of the particle (GeV/c^2)
+     * @param charge Charge of the particle (must not be 0)
+     * @param zTOF Z positions of TOF hits
+     * @param energyDeposited Energy deposited at TOF hits
+     * @param hitTime Hit times at TOF hits
+     * @param hitTimeError Hit time errors at TOF hits
+     */
+    BetaNLPars(
+        AMSPoint pos,
+        AMSDir dir,
+        double beta,
+        double mass,
+        int charge,
+        double zTOF[nTOF],
+        double energyDeposited[nTOF],
+        double hitTime[nTOF],
+        double hitTimeError[nTOF]);
+
+    /**
+     * Destructor
+     */
+    virtual ~BetaNLPars() {};
+
+    // Getters
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Get the beta (v/c) of the particle
+     * @return Beta value
+     */
+    double Beta() const { return _beta; }
+
+    /**
+     * Get the mass in GeV/c^2 of the particle
+     * @return Mass (GeV/c^2)
+     */
+    double Mass() const { return _mass; }
+
+    /**
+     * Get the charge in e of the particle
+     * @note Charge always > 0
+     * @note Refer to BetaNL::Momentum() for sign
+     * @return Charge
+     */
+    int Charge() const { return _charge; }
+
+    /**
+     * Get the position in cm of the particle
+     * @return Position
+     */
+    AMSPoint Pos() const { return _pos; }
+
+    /**
+     * Get the direction of the particle
+     * @return Direction
+     */
+    AMSDir Dir() const { return _dir; }
+
+    // Setters
+    // ---------------------------------------------------------------------------
+
+    /**
+     * DON'T ALLOW SETTERS FOR NOW
+     */
+
+    // Functions
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Get the momentum in GeV/c of the particle
+     * @note > 0 for positive charge, < 0 for negative charge
+     * @return Momentum (GeV/c)
+     */
+    double Momentum() const { return _mass * _beta / sqrt(1 - _beta * _beta); }
+
+    /**
+     * Get the rigidity in GeV/c of the particle
+     * @note > 0 for positive charge, < 0 for negative charge
+     * @return Rigidity (GeV/c)
+     */
+    double Rigidity() const { return Momentum() / _charge; }
+
+private:
+    BetaNLPars(AMSPoint pos, AMSDir dir, double beta, double mass, int charge);
+
+private:
+    // Particle Information
+    // ---------------------------------------------------------------------------
+    AMSPoint _pos = AMSPoint(0, 0, 0); // Position of the particle
+    AMSDir _dir = AMSDir(0, 0, 1);     // Direction of the particle
+    double _beta = 0.8;                // Beta of the particle
+    double _mass = 0.938;              // Mass of the particle (GeV/c^2)
+    int _charge = 1;                   // Charge of the particle (must not be 0)
+
+    // Hit Information
+    // ---------------------------------------------------------------------------
+    std::vector<double> _zTOF;            // Z positions of TOF hits
+    std::vector<double> _energyDeposited; // Energy deposited at TOF hits
+    std::vector<double> _hitTime;         // Hit times at TOF hits
+    std::vector<double> _hitTimeError;    // Hit time errors at TOF hits
+
+    friend class BetaNL;
+};
+
+class BetaNL
+{
+public:
+    // Constructors & Destructors
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Constructor with BetaNLPars
+     * @param pars Parameters for the beta non-linear reconstruction
+     */
+    BetaNL(BetaNLPars pars)
+        : _pars(std::make_shared<BetaNLPars>(pars)) {};
+
+    /**
+     * Destructor
+     */
+    virtual ~BetaNL() {};
+
+    // Getters
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Get the reconstructed beta value by the non-linear method
+     * @return Reconstructed beta value
+     */
+    double Beta() { return 1 / InvBeta(); }
+
+    /**
+     * Get the reconstructed 1/beta value by the non-linear method
+     * @return Reconstructed 1/beta value
+     */
+    double InvBeta() { return reconstruct(); }
+
+private:
+    TrProp Propagator(const double beta) const;             // Get the particle propagator with given beta
+    std::vector<double> propagate(const double beta) const; // Propagate the particle with given beta
+    double Chi2(const double *invBeta) const;               // Calculate the chi-square value
+    double reconstruct();                                   // Reconstruct the 1/beta value
+
+private:
+    std::shared_ptr<BetaNLPars> _pars;          // Parameters for the beta non-linear reconstruction
+    std::shared_ptr<double> _invBeta = nullptr; // Reconstructed 1/beta value
+    double _energyLossScale = 2;                // Energy loss scale factor
+};
+
+#endif // __BETANL_HH__

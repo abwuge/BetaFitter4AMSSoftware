@@ -52,7 +52,7 @@ CXXFLAGS=$(OPTFLAGS) -qopenmp -std=c++11 -Wabi-tag
 ifeq ($(findstring icpx,$(CXX)),icpx)
   CXXFLAGS=$(OPTFLAGS) -qopenmp -std=c++11 -axSSE4.2,SSE4.1,SSSE3,AVX,CORE-AVX2,CORE-AVX512 -fp-model precise -Wabi
 else ifeq ($(findstring g,$(CXX)),g)
-  CXXFLAGS=$(OPTFLAGS) -std=c++11 -Wall -Wabi-tag -Wno-unused-variable -Wno-unused-but-set-variable
+  CXXFLAGS=$(OPTFLAGS) -std=c++11 -Wall -Wabi-tag
 endif 
 CXXFLAGS+= -D_GLIBCXX_USE_CXX11_ABI=0
 
@@ -174,7 +174,7 @@ $(EXE): $(OBJECTS) $(NTUPLE_LIB)
 	$(CXX) -o $@ $(OBJECTS) $(CXXFLAGS) $(DEFINES) -L$(NTUPLE_LIBDIR) -lntuple_slc6_PG$(LIB_SUFFIX) $(shell root-config --libs) -lMinuit -lTMVA -lNetx -lGeom -lMathMore -lEG -lTreePlayer -lMLP -lXMLIO $(LIBAUXS) $(CERNLIB)
 
 clean:
-	rm -f $(BUILDDIR)/*
+	rm -rf $(BUILDDIR)/*
 
 # Handle debug target
 debug: OPTFLAGS=-O0 -g

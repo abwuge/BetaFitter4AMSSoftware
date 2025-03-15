@@ -6,6 +6,7 @@
 #include "TFile.h"
 #include "TTree.h"
 
+#include "BetaNL.hh"
 #include "Util.hh"
 #include "BetaFitter.hh"
 #include "ParticlePropagator.hh"
@@ -97,13 +98,14 @@ int main(int argc, char **argv)
             continue;
 
         // Setup particle propagator with initial state
-        ParticlePropagator propagator(particle);
-        propagator.SetEnergyLossScale(els);
+        // ParticlePropagator propagator(particle);
+        // propagator.SetEnergyLossScale(els);
 
         // Get beta values
         mcBeta = particle.mcBeta;
         linearBeta = particle.betaLinear;
-        nonlinearBeta = 1 / BetaFitter::reconstructBeta(&particle, propagator);
+        // nonlinearBeta = 1 / BetaFitter::reconstructBeta(&particle, propagator);
+        nonlinearBeta = BetaNL(Util::convertToBetaNLPars(particle)).InvBeta();
 
         // Skip invalid reconstructions
         if (nonlinearBeta <= 0 || linearBeta <= 0)
