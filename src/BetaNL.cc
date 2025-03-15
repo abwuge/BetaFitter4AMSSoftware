@@ -68,6 +68,25 @@ BetaNLPars::BetaNLPars(AMSPoint pos, AMSDir dir, double beta, double mass, int c
     }
 }
 
+double BetaNL::EnergyLossScale(double mcBeta)
+{
+    ROOT::Math::Minimizer *minimizer = ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad");
+
+    ROOT::Math::Functor functor(
+        [&](const double *scale)
+        { return scaleChi2(scale, mcBeta); },
+        1);
+    minimizer->SetFunction(functor);
+
+    double lowerLimit = 1.8;
+    double upperLimit = 2.2;
+    minimizer->SetLimitedVariable(0, "scale", 2, 1e-5, lowerLimit, upperLimit);
+
+    minimizer->Minimize();
+
+    return _energyLossScale = minimizer->X()[0];
+}
+
 TrProp BetaNL::Propagator(const double beta) const
 {
     TrProp propagator = TrProp(_pars->Pos(), _pars->Dir());
@@ -116,9 +135,29 @@ std::vector<double> BetaNL::propagate(const double beta) const
     return hitTimes;
 }
 
-double BetaNL::Chi2(const double *invBeta) const
+double BetaNL::betaChi2(const double *invBeta) const
 {
     const double *const hitTimeReconstructed = propagate(1 / invBeta[0]).data();
+    const double *const hitTimeMeasured = _pars->_hitTime.data();
+    const double *const hitTimeError = _pars->_hitTimeError.data();
+
+    double chi2 = 0;
+    for (size_t i = 1; i < BetaNLPars::nTOF; ++i)
+    {
+        if (hitTimeMeasured[i] == -1)
+            continue;
+        double dt = hitTimeReconstructed[i] - hitTimeMeasured[i];
+        double sigma = hitTimeError[i];
+        chi2 += (dt * dt) / (sigma * sigma);
+    }
+
+    return chi2;
+}
+
+double BetaNL::scaleChi2(const double *scale, const double mcBeta)
+{
+    _energyLossScale = scale[0];
+    const double *const hitTimeReconstructed = propagate(mcBeta).data();
     const double *const hitTimeMeasured = _pars->_hitTime.data();
     const double *const hitTimeError = _pars->_hitTimeError.data();
 
@@ -142,7 +181,7 @@ double BetaNL::reconstruct()
 
     ROOT::Math::Minimizer *minimizer = ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad");
 
-    ROOT::Math::Functor functor(this, &BetaNL::Chi2, 1);
+    ROOT::Math::Functor functor(this, &BetaNL::betaChi2, 1);
     minimizer->SetFunction(functor);
 
     double lowerLimit = 1 + 1e-10; // beta < 1

@@ -36,6 +36,15 @@ namespace Util
     std::vector<ParticleData> loadParticleData(const std::string &inputFile);
 
     /**
+     * @brief Save beta reconstruction results to ROOT file
+     *
+     * @param inputFile Path to the ROOT file containing particle data
+     * @param outputFile Path to save the ROOT file containing fit results
+     * @return bool True if fit succeeds, false otherwise
+     */
+    bool saveBeta(const std::string &inputFile, const std::string &outputFile, double energyLossScale = 2);
+
+    /**
      * @brief Save magnetic field information to ROOT file
      *
      * @param outputFile Path to save the ROOT file containing magnetic field data
@@ -44,31 +53,13 @@ namespace Util
     bool saveMagneticField(const std::string &outputFile);
 
     /**
-     * @brief Calculate TOF energy loss for a particle
-     *
-     * @param particle Particle data
-     * @param beta Particle beta
-     * @param energyLoss Array to store energy loss in each TOF layer [output]
-     * @return bool True if calculation succeeds, false otherwise
-     */
-    bool calculateTOFEnergyLoss(const ParticleData &particle, double beta, double energyLoss[4]);
-
-    /**
      * @brief Calculate energy loss information
-     * 
+     *
      * @param inputFile Path to the ROOT file containing particle data
      * @param outputFile Path to save the ROOT file containing energy loss information
      * @return bool True if calculation succeeds, false otherwise
      */
     bool saveEnergyLoss(const std::string &inputFile, const std::string &outputFile);
-
-    /**
-     * @brief Convert ParticleData to BetaNLPars
-     * 
-     * @param particle Particle data to convert
-     * @return BetaNLPars Parameters for beta non-linear reconstruction
-     */
-    BetaNLPars convertToBetaNLPars(const ParticleData &particle);
 }
 
 #endif // __UTIL_HH__

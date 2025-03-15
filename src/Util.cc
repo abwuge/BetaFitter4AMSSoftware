@@ -9,7 +9,6 @@
 #include <TCanvas.h>
 #include <TView.h>
 #include <TText.h>
-#include "TDatabasePDG.h"
 
 // Implementation of getMass function
 float Util::getMass(int pdgId, double charge)
@@ -148,6 +147,79 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     return particles;
 }
 
+bool Util::saveBeta(const std::string &inputFile, const std::string &outputFile, double energyLossScale)
+{
+    // Load particle data from input file
+    std::vector<ParticleData> particles = Util::loadParticleData(inputFile);
+    if (particles.empty())
+    {
+        std::cerr << "Error: No particles loaded from input file" << std::endl;
+        return false;
+    }
+
+    // Create output ROOT file
+    TFile *outFile = new TFile(outputFile.c_str(), "RECREATE");
+    if (!outFile || outFile->IsZombie())
+    {
+        std::cerr << "Error: Could not create output file" << std::endl;
+        return 1;
+    }
+
+    // Create TTree
+    TTree *tree = new TTree("betaTree", "Beta Reconstruction Results");
+    double mcBeta = 0;
+    double linearBeta = 0;
+    double nonlinearBeta = 0;
+
+    // Set up branches
+    tree->Branch("mcBeta", &mcBeta, "mcBeta/D");
+    tree->Branch("linearBeta", &linearBeta, "linearBeta/D");
+    tree->Branch("nonlinearBeta", &nonlinearBeta, "nonlinearBeta/D");
+
+    // Process each particle
+    for (const auto &particle : particles)
+    {
+        // Skip invalid particles
+        if (!particle.isMC)
+            continue;
+
+        if (particle.mcInitCoo[0] == -1000)
+            continue;
+
+        // Get beta values
+        mcBeta = particle.mcBeta;
+        linearBeta = particle.betaLinear;
+        nonlinearBeta =
+            BetaNL(
+                BetaNLPars(
+                    AMSPoint(particle.initCoo[0], particle.initCoo[1], particle.initCoo[2]),
+                    AMSDir(particle.initDir[0], particle.initDir[1], particle.initDir[2]),
+                    particle.betaLinear,
+                    particle.mass,
+                    particle.charge,
+                    particle.TOF_hitZ,
+                    particle.TOF_hitEdep,
+                    particle.TOF_hitTime,
+                    particle.TOF_hitTimeError),
+                energyLossScale)
+                .Beta();
+
+        // Skip invalid reconstructions
+        if (nonlinearBeta <= 0 || linearBeta <= 0)
+            continue;
+
+        // Fill tree
+        tree->Fill();
+    }
+
+    // Write and close
+    tree->Write();
+    outFile->Close();
+    delete outFile;
+
+    return true;
+}
+
 bool Util::saveMagneticField(const std::string &outputFile)
 {
     // Create output ROOT file
@@ -218,35 +290,6 @@ bool Util::saveMagneticField(const std::string &outputFile)
     std::cout << "Magnetic field data saved to " << outputFile << std::endl;
 
     return true;
-}
-
-bool Util::calculateTOFEnergyLoss(const ParticleData &particle, double beta, double energyLoss[4])
-{
-    // not implemented
-
-    // // Calculate momentum and rigidity from beta
-    // double gamma = 1.0 / std::sqrt(1.0 - beta * beta);
-    // double momentum = gamma * beta * particle.mass;
-    // double rigidity = momentum / particle.charge;
-
-    // // Create particle propagator
-    // ParticlePropagator propagator(particle);
-    // propagator.resetPropagator(beta);
-
-    // // Calculate energy loss for each TOF layer
-    // for (int i = 0; i < ParticleData::TOF_MAX_HITS; ++i)
-    // {
-    //     // Calculate energy loss
-    //     double layer_length = propagator.Propagate(particle.TOF_hitZ[i]);
-    //     if (layer_length < 0)
-    //         return false;
-
-    //     double layer_time = layer_length / (beta * SPEED_OF_LIGHT);
-    //     double layer_energy_loss = particle.mass * (1.0 / beta - 1.0 / gamma) * SPEED_OF_LIGHT * layer_time;
-    //     energyLoss[i] = layer_energy_loss;
-    // }
-
-    return false;
 }
 
 bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outputFile)
@@ -375,22 +418,4 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
     fileIn->Close();
 
     return true;
-}
-
-/**
- * Implementation of convertToBetaNLPars function
- * Converts ParticleData to BetaNLPars for beta non-linear reconstruction
- */
-BetaNLPars Util::convertToBetaNLPars(const ParticleData &particle)
-{
-    return BetaNLPars(
-        AMSPoint(particle.initCoo[0], particle.initCoo[1], particle.initCoo[2]),
-        AMSDir(particle.initDir[0], particle.initDir[1], particle.initDir[2]),
-        particle.betaLinear,
-        particle.mass,
-        particle.charge,
-        particle.TOF_hitZ,
-        particle.TOF_hitEdep,
-        particle.TOF_hitTime,
-        particle.TOF_hitTimeError);
 }

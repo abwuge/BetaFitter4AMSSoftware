@@ -28,15 +28,15 @@ public:
 
     /**
      * Constructor with parameters
-     * @param pos Initial position of the particle
+     * @param pos Initial position in cm of the particle
      * @param dir Initial direction of the particle
      * @param beta Initial beta of the particle
-     * @param mass Mass of the particle (GeV/c^2)
-     * @param charge Charge of the particle (must not be 0)
-     * @param zTOF Z positions of TOF hits
-     * @param energyDeposited Energy deposited at TOF hits
-     * @param hitTime Hit times at TOF hits
-     * @param hitTimeError Hit time errors at TOF hits
+     * @param mass Mass in GeV/c^2 of the particle
+     * @param charge Charge in e of the particle (must not be 0)
+     * @param zTOF Z positions in cm of TOF hits
+     * @param energyDeposited Energy deposited in GeV at TOF hits
+     * @param hitTime Hit times in ns at TOF hits
+     * @param hitTimeError Hit time errors in ns at TOF hits
      */
     BetaNLPars(
         AMSPoint pos,
@@ -51,15 +51,15 @@ public:
 
     /**
      * Constructor with parameters
-     * @param pos Initial position of the particle
+     * @param pos Initial position in cm of the particle
      * @param dir Initial direction of the particle
      * @param beta Initial beta of the particle
-     * @param mass Mass of the particle (GeV/c^2)
-     * @param charge Charge of the particle (must not be 0)
-     * @param zTOF Z positions of TOF hits
-     * @param energyDeposited Energy deposited at TOF hits
-     * @param hitTime Hit times at TOF hits
-     * @param hitTimeError Hit time errors at TOF hits
+     * @param mass Mass in GeV/c^2 of the particle
+     * @param charge Charge in e of the particle (must not be 0)
+     * @param zTOF Z positions in cm of TOF hits
+     * @param energyDeposited Energy deposited in GeV at TOF hits
+     * @param hitTime Hit times in ns at TOF hits
+     * @param hitTimeError Hit time errors in ns at TOF hits
      */
     BetaNLPars(
         const AMSPoint pos,
@@ -74,15 +74,15 @@ public:
 
     /**
      * Constructor with parameters
-     * @param pos Initial position of the particle
+     * @param pos Initial position in cm of the particle
      * @param dir Initial direction of the particle
      * @param beta Initial beta of the particle
-     * @param mass Mass of the particle (GeV/c^2)
-     * @param charge Charge of the particle (must not be 0)
-     * @param zTOF Z positions of TOF hits
-     * @param energyDeposited Energy deposited at TOF hits
-     * @param hitTime Hit times at TOF hits
-     * @param hitTimeError Hit time errors at TOF hits
+     * @param mass Mass in GeV/c^2 of the particle
+     * @param charge Charge in e of the particle (must not be 0)
+     * @param zTOF Z positions in cm of TOF hits
+     * @param energyDeposited Energy deposited in GeV at TOF hits
+     * @param hitTime Hit times in ns at TOF hits
+     * @param hitTimeError Hit time errors in ns at TOF hits
      */
     BetaNLPars(
         const AMSPoint pos,
@@ -165,18 +165,18 @@ private:
 private:
     // Particle Information
     // ---------------------------------------------------------------------------
-    AMSPoint _pos = AMSPoint(0, 0, 0); // Position of the particle
+    AMSPoint _pos = AMSPoint(0, 0, 0); // Position in cm of the particle
     AMSDir _dir = AMSDir(0, 0, 1);     // Direction of the particle
     double _beta = 0.8;                // Beta of the particle
-    double _mass = 0.938;              // Mass of the particle (GeV/c^2)
-    int _charge = 1;                   // Charge of the particle (must not be 0)
+    double _mass = 0.938;              // Mass in GeV/c^2 of the particle
+    int _charge = 1;                   // Charge in e of the particle (must not be 0)
 
     // Hit Information
     // ---------------------------------------------------------------------------
-    std::vector<double> _zTOF;            // Z positions of TOF hits
-    std::vector<double> _energyDeposited; // Energy deposited at TOF hits
-    std::vector<double> _hitTime;         // Hit times at TOF hits
-    std::vector<double> _hitTimeError;    // Hit time errors at TOF hits
+    std::vector<double> _zTOF;            // Z positions in cm of TOF hits
+    std::vector<double> _energyDeposited; // Energy deposited in GeV at TOF hits
+    std::vector<double> _hitTime;         // Hit times in ns at TOF hits
+    std::vector<double> _hitTimeError;    // Hit time errors in ns at TOF hits
 
     friend class BetaNL;
 };
@@ -191,8 +191,9 @@ public:
      * Constructor with BetaNLPars
      * @param pars Parameters for the beta non-linear reconstruction
      */
-    BetaNL(BetaNLPars pars)
-        : _pars(std::make_shared<BetaNLPars>(pars)) {};
+    BetaNL(BetaNLPars pars, double energyLossScale = 2)
+        : _pars(std::make_shared<BetaNLPars>(pars)),
+          _energyLossScale(energyLossScale) {};
 
     /**
      * Destructor
@@ -214,11 +215,22 @@ public:
      */
     double InvBeta() { return reconstruct(); }
 
+    // Functions
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Use Monte Carlo beta to calculate energy loss scale factor
+     * @param mcBeta Monte Carlo beta value
+     * @return Energy loss scale factor
+     */
+    double EnergyLossScale(double mcBeta);
+
 private:
-    TrProp Propagator(const double beta) const;             // Get the particle propagator with given beta
-    std::vector<double> propagate(const double beta) const; // Propagate the particle with given beta
-    double Chi2(const double *invBeta) const;               // Calculate the chi-square value
-    double reconstruct();                                   // Reconstruct the 1/beta value
+    TrProp Propagator(const double beta) const;                 // Get the particle propagator with given beta
+    std::vector<double> propagate(const double beta) const;     // Propagate the particle with given beta
+    double betaChi2(const double *invBeta) const;               // Calculate chi-square for beta reconstruction
+    double scaleChi2(const double *scale, const double mcBeta); // Calculate chi-square for energy loss scale
+    double reconstruct();                                       // Reconstruct the 1/beta value
 
 private:
     std::shared_ptr<BetaNLPars> _pars;          // Parameters for the beta non-linear reconstruction
