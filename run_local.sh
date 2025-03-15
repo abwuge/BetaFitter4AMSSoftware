@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Default maximum number of parallel processes
+Z=${1:-8}
+fitOption=${2:-0}
+energyLossScale=${3:-2.0}
+MAX_PROCS=${4:-100}
+
 # Array to store child PIDs
 declare -a CHILD_PIDS
 
@@ -17,12 +23,6 @@ cleanup() {
 
 # Set up signal handlers
 trap cleanup SIGINT SIGTERM
-
-# Default maximum number of parallel processes
-Z=${1:-8}
-fitOption=${2:-0}
-energyLossScale=${3:-2.0}
-MAX_PROCS=${4:-100}
 
 # Get the script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"

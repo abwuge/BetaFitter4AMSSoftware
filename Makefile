@@ -12,8 +12,9 @@ else
 endif
 
 # Define source files and objects
-SOURCES=$(wildcard $(SRCDIR)/*.cc)
-OBJECTS=$(SOURCES:$(SRCDIR)/%.cc=$(OBJDIR)/%.o)
+SOURCES = $(wildcard $(SRCDIR)/*.cc) $(wildcard $(SRCDIR)/*.C)
+OBJECTS = $(SOURCES:$(SRCDIR)/%.cc=$(OBJDIR)/%.o)
+OBJECTS := $(OBJECTS:$(SRCDIR)/%.C=$(OBJDIR)/%.o)
 
 MARCH:=$(shell root-config --arch)
 CXX:=  $(shell root-config --cxx)
@@ -45,8 +46,6 @@ ifneq ("$(wildcard /etc/redhat-release)","")
   VERSIONP = $(VERSION)_$(RH_Version)
 endif
 
-OBJS=$(SRC:%.cc=%.o)
-
 ############
 CXXFLAGS=$(OPTFLAGS) -qopenmp -std=c++11 -Wabi-tag
 ifeq ($(findstring icpx,$(CXX)),icpx)
@@ -76,81 +75,10 @@ ifeq ($(VERSION6),6)
   DEFINES+= -DVERSION6
 endif
 DEFINES+= -D_IONL1PRESCALE_ -D_USELAYERRES_
-############
-APP0=
-APP1=
-APP2=
-APP3=
-APP4=
-APP5=
-APP6=
-APP7=
-APP8=
-ifdef USEPASS7
-  DEFINES+= -D_USEPASS7_
-  APP0:=P8
-endif
-ifdef USEEVENTORDER
-  DEFINES+= -D_USEEVENTORDER_
-  APP1:=ORD
-endif
-#-------
-ifdef USEPRHEION
-  DEFINES+= -D_PRHEPRESCALE3_
-  APP5:=$(APP5)H
-endif
-ifdef USEPRL1
-  DEFINES+= -D_PRL1PRESCALE_
-  APP5:=$(APP5)P
-endif
-ifdef USEHEL1
-  DEFINES+= -D_HEL1PRESCALE_
-  APP5:=$(APP5)A
-endif
-ifdef USEHEINNER
-  DEFINES+= -D_HEINNERPRESCALE_
-  APP5:=$(APP5)B
-endif
-ifdef USEIONINNER
-  DEFINES+= -D_IONINNERPRESCALE_
-  APP5:=$(APP5)I
-endif
-ifdef USESAVENEG
-  DEFINES+= -D_SAVENEGSCALE_
-  APP5:=$(APP5)N
-endif
-#-------
-ifdef USENEWL1L9G
-  DEFINES+= -D_USENEWL1L9G_
-  APP2:=NEWG
-endif
-ifdef USEMCTKRAW
-  DEFINES+= -D_USEMCTKRAW_
-  APP3:=MCTKRAW
-endif
-ifdef USEONEEV
-  DEFINES+= -D_USEONEEV_
-  APP4:=USEONEEV
-endif
-ifdef USEADDTKHIT
-  DEFINES+= -D_USEADDTKHIT_
-  APP6:=MTKHIT
-endif
-ifdef USECALIB
-  DEFINES+= -D_USECALIB_
-  APP7:=CALIB
-endif
-ifdef USENOLINEARCOR
-  DEFINES+= -D_USENOLINEARCOR_
-  APP7:=NOLINEAR
-endif
-ifdef USEKALMANFIT
-  DEFINES+= -D_USEKALMANFIT_
-  APP8:=KM
-endif
 
+############
 # Define directories and targets
-EXE=$(BINDIR)/betaFitter_ROOT$(VERSION6)SLC6$(APP0)$(APP1)$(APP5)$(APP2)$(APP3)$(APP4)$(APP6)$(APP7)$(APP8)
+EXE=$(BINDIR)/betaFitter
 
 # Define static library path and lib directory
 NTUPLE_LIBDIR=$(AMSWD)/lib/$(MARCH)$(VERSIONP)
@@ -168,6 +96,9 @@ init:
 
 # Compilation rules
 $(OBJDIR)/%.o: $(SRCDIR)/%.cc
+	$(CXX) $(CXXFLAGS) $(DEFINES) $(INCLUDEDIRS) -c $< -o $@
+
+$(OBJDIR)/%.o: $(SRCDIR)/%.C
 	$(CXX) $(CXXFLAGS) $(DEFINES) $(INCLUDEDIRS) -c $< -o $@
 
 $(EXE): $(OBJECTS) $(NTUPLE_LIB)

@@ -25,4 +25,4 @@ else
     set energyLossScale = "2.0"
 endif
 
-./build/bin/run/betaFitter_ROOT5SLC6P8HPBN $inputFile $outputFile $fitOption $energyLossScale
+./build/bin/run/betaFitter $inputFile $outputFile $fitOption $energyLossScale
