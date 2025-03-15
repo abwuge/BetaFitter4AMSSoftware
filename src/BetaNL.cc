@@ -23,15 +23,33 @@ BetaNLPars::BetaNLPars(
 }
 
 BetaNLPars::BetaNLPars(
-    AMSPoint pos,
-    AMSDir dir,
-    double beta,
-    double mass,
-    int charge,
-    double zTOF[nTOF],
-    double energyDeposited[nTOF],
-    double hitTime[nTOF],
-    double hitTimeError[nTOF])
+    const AMSPoint pos,
+    const AMSDir dir,
+    const double beta,
+    const double mass,
+    const int charge,
+    const double zTOF[nTOF],
+    const double energyDeposited[nTOF],
+    const double hitTime[nTOF],
+    const double hitTimeError[nTOF])
+    : BetaNLPars(pos, dir, beta, mass, charge)
+{
+    _zTOF.assign(zTOF, zTOF + nTOF);
+    _energyDeposited.assign(energyDeposited, energyDeposited + nTOF);
+    _hitTime.assign(hitTime, hitTime + nTOF);
+    _hitTimeError.assign(hitTimeError, hitTimeError + nTOF);
+}
+
+BetaNLPars::BetaNLPars(
+    const AMSPoint pos,
+    const AMSDir dir,
+    const double beta,
+    const double mass,
+    const int charge,
+    const float zTOF[nTOF],
+    const float energyDeposited[nTOF],
+    const float hitTime[nTOF],
+    const float hitTimeError[nTOF])
     : BetaNLPars(pos, dir, beta, mass, charge)
 {
     _zTOF.assign(zTOF, zTOF + nTOF);
@@ -100,12 +118,12 @@ std::vector<double> BetaNL::propagate(const double beta) const
 
 double BetaNL::Chi2(const double *invBeta) const
 {
-    std::vector<double> hitTimeReconstructed = propagate(1 / invBeta[0]);
+    const double *const hitTimeReconstructed = propagate(1 / invBeta[0]).data();
     const double *const hitTimeMeasured = _pars->_hitTime.data();
     const double *const hitTimeError = _pars->_hitTimeError.data();
 
     double chi2 = 0;
-    for (size_t i = 0; i < BetaNLPars::nTOF; ++i)
+    for (size_t i = 1; i < BetaNLPars::nTOF; ++i)
     {
         if (hitTimeMeasured[i] == -1)
             continue;

@@ -62,15 +62,38 @@ public:
      * @param hitTimeError Hit time errors at TOF hits
      */
     BetaNLPars(
-        AMSPoint pos,
-        AMSDir dir,
-        double beta,
-        double mass,
-        int charge,
-        double zTOF[nTOF],
-        double energyDeposited[nTOF],
-        double hitTime[nTOF],
-        double hitTimeError[nTOF]);
+        const AMSPoint pos,
+        const AMSDir dir,
+        const double beta,
+        const double mass,
+        const int charge,
+        const double zTOF[nTOF],
+        const double energyDeposited[nTOF],
+        const double hitTime[nTOF],
+        const double hitTimeError[nTOF]);
+
+    /**
+     * Constructor with parameters
+     * @param pos Initial position of the particle
+     * @param dir Initial direction of the particle
+     * @param beta Initial beta of the particle
+     * @param mass Mass of the particle (GeV/c^2)
+     * @param charge Charge of the particle (must not be 0)
+     * @param zTOF Z positions of TOF hits
+     * @param energyDeposited Energy deposited at TOF hits
+     * @param hitTime Hit times at TOF hits
+     * @param hitTimeError Hit time errors at TOF hits
+     */
+    BetaNLPars(
+        const AMSPoint pos,
+        const AMSDir dir,
+        const double beta,
+        const double mass,
+        const int charge,
+        const float zTOF[nTOF],
+        const float energyDeposited[nTOF],
+        const float hitTime[nTOF],
+        const float hitTimeError[nTOF]);
 
     /**
      * Destructor

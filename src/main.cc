@@ -2,7 +2,6 @@
 #include <string>
 #include <vector>
 
-#include "amschain.h"
 #include "TFile.h"
 #include "TTree.h"
 
@@ -105,7 +104,7 @@ int main(int argc, char **argv)
         mcBeta = particle.mcBeta;
         linearBeta = particle.betaLinear;
         // nonlinearBeta = 1 / BetaFitter::reconstructBeta(&particle, propagator);
-        nonlinearBeta = BetaNL(Util::convertToBetaNLPars(particle)).InvBeta();
+        nonlinearBeta = BetaNL(Util::convertToBetaNLPars(particle)).Beta();
 
         // Skip invalid reconstructions
         if (nonlinearBeta <= 0 || linearBeta <= 0)
