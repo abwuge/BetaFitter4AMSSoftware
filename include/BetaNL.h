@@ -215,12 +215,6 @@ public:
      */
     double InvBeta() { return reconstruct(); }
 
-    /**
-     * Get the reconstructed time offset
-     * @return Time offset in ns
-     */
-    double TimeOffset() { reconstruct(); return _timeOffset; }
-
     // Functions
     // ---------------------------------------------------------------------------
 
@@ -234,7 +228,7 @@ public:
 private:
     TrProp Propagator(const double beta) const;                 // Get the particle propagator with given beta
     std::vector<double> propagate(const double beta) const;     // Propagate the particle with given beta
-    double betaChi2(const double *params) const;                // Calculate chi-square for beta reconstruction with params[0]=invBeta, params[1]=timeOffset
+    double betaChi2(const double *params);                      // Calculate chi-square for beta reconstruction with params[0]=invBeta, params[1]=timeOffset
     double scaleChi2(const double *scale, const double mcBeta); // Calculate chi-square for energy loss scale
     double reconstruct();                                       // Reconstruct the 1/beta value
 

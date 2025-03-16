@@ -73,14 +73,22 @@ double BetaNL::EnergyLossScale(double mcBeta)
     ROOT::Math::Minimizer *minimizer = ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad");
 
     ROOT::Math::Functor functor(
-        [&](const double *scale)
-        { return scaleChi2(scale, mcBeta); },
-        1);
+        [&](const double *params)
+        { return scaleChi2(params, mcBeta); },
+        2);
     minimizer->SetFunction(functor);
 
-    double lowerLimit = 1;
-    double upperLimit = 3;
-    minimizer->SetLimitedVariable(0, "scale", 2, 1e-5, lowerLimit, upperLimit);
+    double scaleRange = 10;
+    double initialScale = 2;
+    double lowerScale = initialScale - scaleRange;
+    double upperScale = initialScale + scaleRange;
+    minimizer->SetLimitedVariable(0, "scale", initialScale, 0.1 * scaleRange, lowerScale, upperScale);
+
+    double timeError = _pars->_hitTimeError[0];
+    double initialTimeOffset = _pars->_hitTime[0];
+    double lowerTimeOffset = initialTimeOffset - 5 * timeError;
+    double upperTimeOffset = initialTimeOffset + 5 * timeError;
+    minimizer->SetLimitedVariable(1, "timeOffset", initialTimeOffset, 0.1 * timeError, lowerTimeOffset, upperTimeOffset);
 
     minimizer->Minimize();
 
@@ -135,10 +143,10 @@ std::vector<double> BetaNL::propagate(const double beta) const
     return hitTimes;
 }
 
-double BetaNL::betaChi2(const double *params) const
+double BetaNL::betaChi2(const double *params)
 {
     const double invBeta = params[0];
-    const double timeOffset = params[1];
+    _timeOffset = params[1];
 
     const double *const hitTimeReconstructed = propagate(1 / invBeta).data();
     const double *const hitTimeMeasured = _pars->_hitTime.data();
@@ -149,7 +157,7 @@ double BetaNL::betaChi2(const double *params) const
     {
         if (hitTimeMeasured[i] == -1)
             continue;
-        double dt = hitTimeReconstructed[i] - (hitTimeMeasured[i] - timeOffset);
+        double dt = hitTimeReconstructed[i] - (hitTimeMeasured[i] - _timeOffset);
         double sigma = hitTimeError[i];
         chi2 += (dt * dt) / (sigma * sigma);
     }
@@ -157,9 +165,11 @@ double BetaNL::betaChi2(const double *params) const
     return chi2;
 }
 
-double BetaNL::scaleChi2(const double *scale, const double mcBeta)
+double BetaNL::scaleChi2(const double *params, const double mcBeta)
 {
-    _energyLossScale = scale[0];
+    _energyLossScale = params[0];
+    _timeOffset = params[1];
+
     const double *const hitTimeReconstructed = propagate(mcBeta).data();
     const double *const hitTimeMeasured = _pars->_hitTime.data();
     const double *const hitTimeError = _pars->_hitTimeError.data();
@@ -169,7 +179,7 @@ double BetaNL::scaleChi2(const double *scale, const double mcBeta)
     {
         if (hitTimeMeasured[i] == -1)
             continue;
-        double dt = hitTimeReconstructed[i] - hitTimeMeasured[i];
+        double dt = hitTimeReconstructed[i] - (hitTimeMeasured[i] - _timeOffset);
         double sigma = hitTimeError[i];
         chi2 += (dt * dt) / (sigma * sigma);
     }
