@@ -9,9 +9,76 @@
 #include <TROOT.h>
 #include <iostream>
 #include <string>
+#include <fstream>
+#include <vector>
 #include <TPaveText.h>
 #include <TGraphErrors.h>
 #include <TMath.h>
+#include <TFitResult.h>
+
+/**
+ * Get Z value for a file from README.md
+ * @param fileName Name of the ROOT file
+ * @return Z value. Returns -1 if not found
+ */
+int getParamsFromReadme(const std::string &fileName)
+{
+    std::ifstream readme("results/README.md");
+    if (!readme)
+    {
+        std::cerr << "Error: Could not open results/README.md" << std::endl;
+        return -1;
+    }
+    std::string line;
+    std::string targetFile = fileName;
+
+    // If fileName starts with "results/", remove it
+    if (targetFile.substr(0, 8) == "results/")
+        targetFile = targetFile.substr(8);
+    else
+    {
+        std::cerr << "Warning: File name does not start with 'results/'"
+                  << "\nCannot find the file in README.md" << std::endl;
+        return -1;
+    }
+
+    int latestZ = -1;
+    // Read file from bottom to top to get the latest entry
+    std::vector<std::string> lines;
+    while (std::getline(readme, line))
+        lines.push_back(line);
+
+        // Search from the end to find the latest matching entry
+    for (auto it = lines.rbegin(); it != lines.rend(); ++it)
+    {
+        size_t filePos = it->find("FILE = " + targetFile);
+        if (filePos != std::string::npos)
+        {
+            // Get Z value
+            size_t zPos = it->find("Z = ", filePos);
+            if (zPos != std::string::npos)
+            {
+                zPos += 4; // Skip "Z = "
+                size_t commaPos = it->find(",", zPos);
+                if (commaPos != std::string::npos)
+                {
+                    std::string zStr = it->substr(zPos, commaPos - zPos);
+                    try
+                    {
+                        latestZ = std::stoi(zStr);
+                    }
+                    catch (...)
+                    {
+                        continue;
+                    }
+                }
+            }
+            if (latestZ > 0)
+                break;
+        }
+    }
+    return latestZ;
+}
 
 /**
  * Draw energy loss scale distribution from a ROOT file containing scaleTree tree
@@ -20,7 +87,7 @@
  * @param outputName Output file name
  */
 void plotEnergyLossScale(std::string fileName = "test.root",
-                         const char *outputName = "test_energy_loss_scale.pdf")
+                         const char *outputName = nullptr)
 {
     // Set batch mode to avoid GUI related issues
     gROOT->SetBatch(true);
@@ -36,14 +103,28 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     TFile *file = TFile::Open(fileName.c_str(), "READ");
     if (!file || file->IsZombie())
     {
-        std::string resultsPath = "results/" + fileName;
-        std::cout << "Try to open file: " << resultsPath << std::endl;
-        file = TFile::Open(resultsPath.c_str(), "READ");
+        fileName = "results/" + fileName;
+        std::cout << "Try to open file: " << fileName << std::endl;
+
+        file = TFile::Open(fileName.c_str(), "READ");
         if (!file || file->IsZombie())
         {
-            std::cerr << "Error: Unable to open file " << fileName << " or " << resultsPath << std::endl;
+            std::cerr << "Error: Unable to find/open file " << fileName << std::endl;
             return;
         }
+    }
+
+    // Get Z value and energyLossScale from the file
+    int zValue = getParamsFromReadme(fileName);
+
+    std::string actualOutputName;
+    if (!outputName)
+    {
+        if (zValue > 0)
+            actualOutputName = Form("test_zeta_Z%d.pdf", zValue);
+        else
+            actualOutputName = "test_zeta.pdf";
+        outputName = actualOutputName.c_str();
     }
 
     // Get the energy loss scale tree
@@ -128,8 +209,20 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     TPaveText *infoText = new TPaveText(0.2, 0.92, 0.8, 0.98, "NDC");
     infoText->SetFillColor(0);
     infoText->SetBorderSize(0);
-    infoText->AddText(Form("mcBeta < 0.9"));
+
+    if (zValue > 0)
+        infoText->AddText(Form("Z = %d, mcBeta < 0.9", zValue));
+    else
+        infoText->AddText(Form("mcBeta < 0.9"));
+
     infoText->Draw();
+
+    TLegend *legend = new TLegend(0.62, 0.67, 0.87, 0.87);
+    legend->SetBorderSize(kNone);
+    legend->AddEntry("", Form("#mu = %.4g", hEnergyLossScale->GetMean()), "");
+    legend->AddEntry("", Form("#sigma = %.4g", hEnergyLossScale->GetRMS()), "");
+    legend->AddEntry("", Form("Entries: %d", (int)hEnergyLossScale->GetEntries()), "");
+    legend->Draw();
 
     canvas1->Print(Form("%s(", outputName));
 
