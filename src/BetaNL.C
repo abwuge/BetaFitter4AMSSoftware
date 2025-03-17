@@ -1,8 +1,22 @@
+
+//////////////////////////////////////////////////////////////////////////
+///
+///\file  BetaNL.C
+///\brief Source file of BetaNLPars & BetaNL class
+///
+///\date  2025/3/15 HW First stable version
+///$Date: 2023/12/08 15:32:50 $
+///
+///$Revision: 1.0 $
+///
+//////////////////////////////////////////////////////////////////////////
+
 #include "BetaNL.h"
 
-#include <Math/Minimizer.h>
 #include <Math/Factory.h>
 #include <Math/Functor.h>
+#include <Math/Minimizer.h>
+#include <TMath.h>
 
 BetaNLPars::BetaNLPars(
     AMSPoint pos,
@@ -62,10 +76,7 @@ BetaNLPars::BetaNLPars(AMSPoint pos, AMSDir dir, double beta, double mass, int c
     : _pos(pos), _dir(dir), _beta(beta), _mass(mass), _charge(charge)
 {
     if (charge == 0)
-    {
-        std::cerr << "BetaNLPars: Charge cannot be zero. Setting charge to 1." << std::endl;
-        _charge = 1;
-    }
+        std::cerr << "Info in <BetaNLPars::BetaNLPars>: Charge is zero!" << std::endl;
 }
 
 double BetaNL::EnergyLossScale(double mcBeta)
@@ -95,7 +106,10 @@ double BetaNL::EnergyLossScale(double mcBeta)
     return _energyLossScale = minimizer->X()[0];
 }
 
-TrProp BetaNL::Propagator(const double beta) const
+/**
+ * @brief Get a TrProp object with the particle parameters
+ */
+TrProp BetaNL::Propagator() const
 {
     TrProp propagator = TrProp(_pars->Pos(), _pars->Dir());
     propagator.SetMassChrg(_pars->Mass(), _pars->Charge());
@@ -103,15 +117,31 @@ TrProp BetaNL::Propagator(const double beta) const
     return propagator;
 }
 
+/**
+ * @note When a particle comes to rest, the hit time remains 0.
+ *       This design choice serves two purposes:
+ *
+ *       1. A zero hit time naturally penalizes the χ² (chi-square) statistic
+ *          through standard error propagation in the optimization process.
+ *
+ *       2. Alternative approaches using large numerical values (e.g., MAX_FLOAT)
+ *          would create discontinuous jumps in the χ² landscape, causing
+ *          numerical instability in Hessian matrix calculations during
+ *          minimization.
+ *
+ * The current implementation maintains better numerical stability while
+ * preserving the physical interpretation of stationary particles in the
+ * tracking algorithm.
+ */
 std::vector<double> BetaNL::propagate(const double beta) const
 {
     std::vector<double> hitTimes(BetaNLPars::nTOF, 0.0);
-    TrProp propagator = Propagator(beta);
+    TrProp propagator = Propagator();
 
     double mass = _pars->Mass();
     double mass2 = mass * mass;
     double energy = mass / TMath::Sqrt(1 - beta * beta);
-    double invCharge = 1.0 / _pars->_charge;
+    double invCharge = _pars->_charge == 0 ? 0 : 1.0 / _pars->_charge;
     const double *const energyDeposited = _pars->_energyDeposited.data();
     const double *const zTOF = _pars->_zTOF.data();
 
@@ -132,6 +162,9 @@ std::vector<double> BetaNL::propagate(const double beta) const
         // Propagate to this TOF layer
         // ------------------------------------------
         // Calculate path length
+        // TODO: In TrProp::Propagate -> TrProp::Interpolate -> TrProp::VCFitPar, 
+        // change `if (fabs(h) > steps && imat++ == 0) { ... }` to `if (fabs(h) > steps && imat++ == 0 && m55) { ... }`
+        // may improve the performance and do NOT change the result.
         double length = propagator.Propagate(zTOF[i]);
         if (length < 0)
             break;
@@ -143,6 +176,10 @@ std::vector<double> BetaNL::propagate(const double beta) const
     return hitTimes;
 }
 
+/**
+ * @param params[0] Inverse beta (1/beta)
+ * @param params[1] Time offset
+ */
 double BetaNL::betaChi2(const double *params)
 {
     const double invBeta = params[0];
@@ -155,7 +192,7 @@ double BetaNL::betaChi2(const double *params)
     double chi2 = 0;
     for (size_t i = 0; i < BetaNLPars::nTOF; ++i)
     {
-        if (hitTimeMeasured[i] == -1)
+        if (hitTimeMeasured[i] == -1) // Skip missing hit times
             continue;
         double dt = hitTimeReconstructed[i] - (hitTimeMeasured[i] - _timeOffset);
         double sigma = hitTimeError[i];
@@ -165,6 +202,11 @@ double BetaNL::betaChi2(const double *params)
     return chi2;
 }
 
+/**
+ * @param params[0] Energy loss scale factor
+ * @param params[1] Time offset
+ * @param mcBeta Monte Carlo beta value
+ */
 double BetaNL::scaleChi2(const double *params, const double mcBeta)
 {
     _energyLossScale = params[0];
@@ -187,6 +229,27 @@ double BetaNL::scaleChi2(const double *params, const double mcBeta)
     return chi2;
 }
 
+/**
+ * @brief Performs β⁻¹ reconstruction using Minuit2 optimization framework.
+ * 
+ * Mathematical formulation:
+ * 
+ *   χ² = ∑[(t_reco - (t_tofMeasured - timeOffset))² / hitTimeError²]
+ *   
+ * Where:
+ *   - t_reco:      Reconstructed time from particle hypothesis
+ *   - timeOffset:  Detector timing calibration constant (ns)
+ *   - hitTimeError: Timing resolution (σ) of the detection system
+ * 
+ * @note Critical design choices:
+ * 
+ * 1. Variable selection:
+ *    - Uses β⁻¹ (1/β) as minimization parameter instead of β because:
+ *      a) Better Hessian matrix condition number in relativistic regime
+ *      b) Maintains linearity in dE/dx relationships
+ * 
+ * @see Minuit2 documentation: https://root.cern.ch/doc/master/Minuit2Page.html
+ */
 double BetaNL::reconstruct()
 {
     if (_invBeta)
