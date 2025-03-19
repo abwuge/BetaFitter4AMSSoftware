@@ -162,8 +162,21 @@ std::vector<double> BetaNL::propagate(const double beta) const
 
     double mass = _pars->Mass();
     double mass2 = mass * mass;
-    double energy = mass / TMath::Sqrt(1 - beta * beta);
-    double invCharge = _pars->_charge == 0 ? 0 : 1.0 / _pars->_charge;
+
+    double invCharge;
+    if (_pars->Charge() == 0 || TMath::Abs(beta - 1) < 1e-10)
+        invCharge = 0;
+    else
+        invCharge = 1.0 / _pars->Charge();
+
+    double energy;
+    if (TMath::Abs(beta - 1) < 1e-10)
+        energy = mass;
+    else if (beta > 1)
+        energy = mass / TMath::Sqrt(1 - (2 - beta) * (2 - beta));
+    else
+        energy = mass / TMath::Sqrt(1 - beta * beta);
+
     const double *const energyDeposited = _pars->_energyDeposited.data();
     const double *const zTOF = _pars->_zTOF.data();
 
@@ -282,8 +295,14 @@ double BetaNL::reconstruct()
     ROOT::Math::Functor functor(this, &BetaNL::betaChi2, 2);
     minimizer->SetFunction(functor);
 
-    double lowerInvBeta = 1 + 1e-10; // beta < 1
-    double upperInvBeta = 3;         // beta > 0.33
+    /**
+     * ALLOW BETA > 1
+     * ----------------
+     * if beta > 1, we will treat the particle as having the opposite charge
+     * and consider its actual beta to be 1 - (beta - 1).
+     */
+    double lowerInvBeta = 0.6; // beta < 1.11
+    double upperInvBeta = 3;   // beta > 0.33
     double initialInvBeta = TMath::Range(lowerInvBeta, upperInvBeta, 1 / _pars->_beta);
     minimizer->SetLimitedVariable(0, "invBeta", initialInvBeta, 1e-5, lowerInvBeta, upperInvBeta);
 
