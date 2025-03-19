@@ -13,6 +13,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <TFitResult.h>
 
 /**
  * Get Z value and energyLossScale for a file from README.md
@@ -116,14 +117,15 @@ std::pair<int, double> getParamsFromReadme(const std::string &fileName)
 void plotBetaComparison(std::string fileName = "test.root",
                         const char *outputName = nullptr)
 {
-    // Set batch mode to avoid GUI related issues
     gROOT->SetBatch(true);
     gROOT->SetStyle("Pub");
     gStyle->SetLineWidth(2);
     gStyle->SetFrameLineWidth(2);
     gStyle->SetEndErrorSize(20);
 
-    // Open the ROOT file
+    // Open file
+    // ------------------------------------------------------------------------
+
     if (fileName.size() < 5 || fileName.substr(fileName.size() - 5) != ".root")
         fileName += ".root";
 
@@ -141,7 +143,8 @@ void plotBetaComparison(std::string fileName = "test.root",
         }
     }
 
-    // Auto-generate output name if not specified
+    // Generate output name
+    // ------------------------------------------------------------------------
 
     // Get Z value and energyLossScale from the file
     auto params = getParamsFromReadme(fileName);
@@ -149,6 +152,7 @@ void plotBetaComparison(std::string fileName = "test.root",
     double energyLossScale = params.second;
     std::string actualOutputName;
 
+    // Set output name
     if (!outputName)
     {
         if (zValue > 0 && energyLossScale > 0)
@@ -158,7 +162,9 @@ void plotBetaComparison(std::string fileName = "test.root",
         outputName = actualOutputName.c_str();
     }
 
-    // Get the beta reconstruction tree
+    // Get tree
+    // ------------------------------------------------------------------------
+
     TTree *tree = (TTree *)file->Get("betaTree");
     if (!tree)
     {
@@ -176,42 +182,38 @@ void plotBetaComparison(std::string fileName = "test.root",
         return;
     }
 
-    // Use a more efficient approach to get beta range - default values
-    double mcBetaMin = tree->GetMinimum("mcBeta");
-    double mcBetaMax = tree->GetMaximum("mcBeta");
+    const double xMin = tree->GetMinimum("mcBeta");
+    const double xMax = tree->GetMaximum("mcBeta");
 
-    // Define variables for reading from tree
     double mcBeta, linearBeta, nonlinearBeta;
 
-    // Set branch addresses
     tree->SetBranchAddress("mcBeta", &mcBeta);
     tree->SetBranchAddress("linearBeta", &linearBeta);
     tree->SetBranchAddress("nonlinearBeta", &nonlinearBeta);
 
-    // Create histograms for the 2D plots
-    // Using reasonable beta range from 0.1 to 1.0
-    int nBinsX = 40;                           // Number of bins in x direction
-    int nBinsY = 100;                          // Number of bins in y direction for the residual plot
-    double xMin = mcBetaMin, xMax = mcBetaMax; // Range for the beta values
+    // Bin
+    // ------------------------------------------------------------------------
+
+    // Set bin numbers
+    const int nBinsX = 40;
+    const int nBinsY = 100;
+
+    // Bin width
+    const double binWidth = (xMax - xMin) / nBinsX;
+
+    // Get Quantile Range
+    // ------------------------------------------------------------------------
 
     // Helper function to get range using quantiles
     auto getQuantileRange = [&tree](const char *branchName, double lowQuantile = 0.01, double highQuantile = 0.99, bool diff = true) -> std::pair<double, double>
     {
-        // Create a high-precision temporary histogram with reasonable initial range
         TH1D hTemp(Form("hTemp_%s", branchName), "", 10000, 0, 0);
 
-        // Use TFormula for efficient calculation
         if (diff)
-        {
-            TString formula = TString::Format("1/%s - 1/mcBeta", branchName);
-            tree->Draw(Form("%s>>hTemp_%s", formula.Data(), branchName), "", "goff");
-        }
+            tree->Draw(Form("1/%s - 1/mcBeta>>hTemp_%s", branchName, branchName), "", "goff");
         else
-        {
             tree->Draw(Form("%s>>hTemp_%s", branchName, branchName), "", "goff");
-        }
 
-        // Calculate quantiles
         Double_t xq[2] = {lowQuantile, highQuantile};
         Double_t yq[2] = {0, 0};
         hTemp.GetQuantiles(2, yq, xq);
@@ -220,333 +222,80 @@ void plotBetaComparison(std::string fileName = "test.root",
         return std::make_pair(yq[0], yq[1]);
     };
 
-    // Get ranges for residuals using quantiles
-    auto nonlinearResRange = getQuantileRange("nonlinearBeta", 1e-4, 1 - 1e-4);
-    // auto linearResRange = getQuantileRange("linearBeta", 1e-4, 1 - 1e-4);
+    // Get beta range
+    const auto betaRange = getQuantileRange("nonlinearBeta", 1e-4, 1 - 1e-4, false);
+    const double yMin = betaRange.first;
+    const double yMax = betaRange.second;
 
-    // Use independent ranges for first two pages
-    double yMinResNL = nonlinearResRange.first;
-    double yMaxResNL = nonlinearResRange.second;
+    // Get residuals range
+    const auto resRange = getQuantileRange("nonlinearBeta", 1e-4, 1 - 1e-4);
+    const double yMinRes = resRange.first;
+    const double yMaxRes = resRange.second;
 
-    // double yMinResL = linearResRange.first;
-    // double yMaxResL = linearResRange.second;
+    // Draw
+    // ------------------------------------------------------------------------
 
-    double yMinResL = yMinResNL;
-    double yMaxResL = yMaxResNL;
+    // Create beta histograms
+    TH2F *hNonlinearVsMC = new TH2F("hNonlinearVsMC",
+                                    "Non-linear Beta vs MC Beta;#beta_{MC};#beta_{non-linear}",
+                                    100, xMin, xMax, 100, yMin, yMax);
+    TH2F *hLinearVsMC = new TH2F("hLinearVsMC",
+                                 "Linear Beta vs MC Beta;#beta_{MC};#beta_{linear}",
+                                 100, xMin, xMax, 100, yMin, yMax);
 
-    // // Use the wider range for the comparison page
-    double yMinRes = std::min(yMinResNL, yMinResL);
-    double yMaxRes = std::max(yMaxResNL, yMaxResL);
-
-    // Create histograms for the residuals plot with independent ranges
+    // Create residuals histograms
     TH2F *hNonlinearResVsMC = new TH2F("hNonlinearResVsMC",
                                        "Non-linear Reconstruction Residuals;#beta_{MC};1/#beta_{non-linear} - 1/#beta_{MC}",
-                                       nBinsX, xMin, xMax, nBinsY, yMinResNL, yMaxResNL);
+                                       nBinsX, xMin, xMax, nBinsY, yMinRes, yMaxRes);
     TH2F *hLinearResVsMC = new TH2F("hLinearResVsMC",
                                     "Linear Reconstruction Residuals;#beta_{MC};1/#beta_{linear} - 1/#beta_{MC}",
-                                    nBinsX, xMin, xMax, nBinsY, yMinResL, yMaxResL);
+                                    nBinsX, xMin, xMax, nBinsY, yMinRes, yMaxRes);
 
+    // Create comparison plot
+    TH2F *hComparison = new TH2F("hComparison",
+                                 "Beta Reconstruction Methods Comparison;#beta_{MC};1/#beta_{rec} - 1/#beta_{MC}",
+                                 nBinsX, xMin, xMax, nBinsY, yMinRes, yMaxRes);
+
+    // Set minimum value to 1
+    hNonlinearVsMC->SetMinimum(1);
+    hLinearVsMC->SetMinimum(1);
     hNonlinearResVsMC->SetMinimum(1);
     hLinearResVsMC->SetMinimum(1);
 
-    // Fill 2D histograms efficiently using TFormula
-    tree->Draw("1/nonlinearBeta - 1/mcBeta:mcBeta>>hNonlinearResVsMC", "", "goff");
-    tree->Draw("1/linearBeta - 1/mcBeta:mcBeta>>hLinearResVsMC", "", "goff");
+    // Fill histograms
+    tree->Draw("nonlinearBeta:mcBeta>>hNonlinearVsMC",
+               Form("nonlinearBeta > %f && nonlinearBeta < %f", yMin, yMax),
+               "goff");
+    tree->Draw("linearBeta:mcBeta>>hLinearVsMC",
+               Form("linearBeta > %f && linearBeta < %f", yMin, yMax),
+               "goff");
+    tree->Draw("1/nonlinearBeta - 1/mcBeta:mcBeta>>hNonlinearResVsMC",
+               Form("1/nonlinearBeta - 1/mcBeta > %f && 1/nonlinearBeta - 1/mcBeta < %f", yMinRes, yMaxRes),
+               "goff");
+    tree->Draw("1/linearBeta - 1/mcBeta:mcBeta>>hLinearResVsMC",
+               Form("1/linearBeta - 1/mcBeta > %f && 1/linearBeta - 1/mcBeta < %f", yMinRes, yMaxRes),
+               "goff");
 
-    auto nonlinearBetaRange = getQuantileRange("nonlinearBeta", 1e-4, 1 - 1e-4, false);
-    double yMinNL = nonlinearBetaRange.first;
-    double yMaxNL = nonlinearBetaRange.second;
+    // Print beta
+    // ------------------------------------------------------------------------
 
-    // auto linearBetaRange = getQuantileRange("linearBeta", 1e-4, 1 - 1e-4, false);
-    // double yMinL = linearBetaRange.first;
-    // double yMaxL = linearBetaRange.second;
+    // Create canvas
+    TCanvas *canvas = new TCanvas("canvas", "", 3508, 2480); // A4 landscape
+    canvas->SetLeftMargin(0.16);
+    canvas->SetRightMargin(0.12);
+    canvas->SetGridx();
+    canvas->SetGridy();
+    canvas->SetLogz();
 
-    double yMinL = yMinNL;
-    double yMaxL = yMaxNL;
+    // Open PDF file
+    canvas->Print(Form("%s[", outputName));
 
-    // Create 2D histograms for beta comparison
-    TH2F *hNonlinearVsMC = new TH2F("hNonlinearVsMC",
-                                    "Non-linear Beta vs MC Beta;#beta_{MC};#beta_{non-linear}",
-                                    100, mcBetaMin, mcBetaMax, 100, yMinNL, yMaxNL);
-    TH2F *hLinearVsMC = new TH2F("hLinearVsMC",
-                                 "Linear Beta vs MC Beta;#beta_{MC};#beta_{linear}",
-                                 100, mcBetaMin, mcBetaMax, 100, yMinL, yMaxL);
+    // Create perfect correlation line
+    TF1 *perfectCorrelation = new TF1("perfectCorrelation", "x", xMin, xMax);
+    perfectCorrelation->SetLineColor(kRed);
+    perfectCorrelation->SetLineStyle(2);
 
-    // Fill beta comparison histograms
-    tree->Draw("nonlinearBeta:mcBeta>>hNonlinearVsMC", "", "goff");
-    tree->Draw("linearBeta:mcBeta>>hLinearVsMC", "", "goff");
-
-    // Create canvas for beta comparison plots
-    TCanvas *cBetaComp1 = new TCanvas("cBetaComp1", "Non-linear Beta vs MC Beta", 3508, 2480);
-    cBetaComp1->SetLeftMargin(0.16);
-    cBetaComp1->SetRightMargin(0.11);
-    cBetaComp1->SetGridx();
-    cBetaComp1->SetGridy();
-    cBetaComp1->SetLogz();
-
-    hNonlinearVsMC->Draw("COLZ");
-
-    // Draw perfect correlation line
-    TF1 *perfect1 = new TF1("perfect1", "x", mcBetaMin, mcBetaMax);
-    perfect1->SetLineColor(kRed);
-    perfect1->SetLineStyle(2);
-    perfect1->Draw("SAME");
-
-    // Add Z value and energyLossScale at the top if available
-    TPaveText *infoText1 = nullptr;
-    if (zValue > 0)
-    {
-        infoText1 = new TPaveText(0.2, 0.92, 0.8, 0.98, "NDC");
-        infoText1->SetFillColor(0);
-        infoText1->SetBorderSize(0);
-        infoText1->AddText(Form("Z = %d, #zeta = %.3f", zValue, energyLossScale));
-        infoText1->Draw();
-    }
-
-    TCanvas *canvas = new TCanvas("canvas", "Beta Residuals Comparison", 3508, 2480);
-    canvas->Print(Form("%s[", outputName)); // Open PDF file
-    cBetaComp1->Print(outputName);
-
-    // Second page - Linear beta comparison
-    TCanvas *cBetaComp2 = new TCanvas("cBetaComp2", "Linear Beta vs MC Beta", 3508, 2480);
-    cBetaComp2->SetLeftMargin(0.16);
-    cBetaComp2->SetRightMargin(0.11);
-    cBetaComp2->SetGridx();
-    cBetaComp2->SetGridy();
-    cBetaComp2->SetLogz();
-
-    hLinearVsMC->Draw("COLZ");
-
-    // Draw perfect correlation line
-    TF1 *perfect2 = new TF1("perfect2", "x", mcBetaMin, mcBetaMax);
-    perfect2->SetLineColor(kRed);
-    perfect2->SetLineStyle(2);
-    perfect2->Draw("SAME");
-
-    // Add Z value and energyLossScale at the top if available
-    TPaveText *infoText2 = nullptr;
-    if (zValue > 0)
-    {
-        infoText2 = new TPaveText(0.2, 0.92, 0.8, 0.98, "NDC");
-        infoText2->SetFillColor(0);
-        infoText2->SetBorderSize(0);
-        infoText2->AddText(Form("Z = %d, #zeta = %.3f", zValue, energyLossScale));
-        infoText2->Draw();
-    }
-
-    cBetaComp2->Print(outputName);
-
-    // Arrays to store fit results and weights
-    const int nProfiles = nBinsX;
-    double mcBetaValues[nProfiles];
-    double nonlinearMean[nProfiles], nonlinearError[nProfiles], nonlinearWeight[nProfiles];
-    double linearMean[nProfiles], linearError[nProfiles], linearWeight[nProfiles];
-
-    // Print table header before the loop
-    std::cout << std::endl;
-    std::cout << "Bin\tBeta\t\tProj_NL\tProj_L\tNL_mean\t\tL_mean" << std::endl;
-    std::cout << std::string(65, '-') << std::endl;
-
-    double binWidth = (xMax - xMin) / nBinsX;
-    for (int bin = 0; bin < nProfiles; ++bin)
-    {
-        double binCenter = xMin + (bin + 0.5) * binWidth;
-        int binIdx = bin + 1; // ROOT histograms are 1-indexed
-
-        // Calculate bin range for projection with wider window
-        int binWindow = 1; // Use ±1 bins for better statistics
-        int binLow = TMath::Max(1, binIdx - binWindow);
-        int binHigh = TMath::Min(nBinsX, binIdx + binWindow);
-
-        mcBetaValues[bin] = binCenter;
-
-        // Process nonlinear beta residual distribution with explicit options
-        TH1D *projNonlinear = hNonlinearResVsMC->ProjectionY(Form("projNL_%d", bin), binLow, binHigh, "e"); // 'e' option to keep errors
-        Int_t projNLEntries = projNonlinear->GetEntries();
-
-        if (projNLEntries) // Only fit if we have enough statistics
-        {
-            // Add reasonable initial parameters for the fit
-            projNonlinear->Fit("gaus", "QN", "", yMinRes, yMaxRes); // Add fit range
-            TF1 *fitNL = projNonlinear->GetFunction("gaus");
-            if (fitNL && fitNL->GetProb() > 0.01) // Check if fit is reasonable
-            {
-                nonlinearMean[bin] = fitNL->GetParameter(1);
-                nonlinearError[bin] = fitNL->GetParameter(2);
-            }
-            else
-            {
-                nonlinearMean[bin] = projNonlinear->GetMean(); // Use histogram mean if fit fails
-                nonlinearError[bin] = projNonlinear->GetRMS();
-            }
-        }
-        else
-        {
-            nonlinearMean[bin] = 0;
-            nonlinearError[bin] = 0;
-        }
-        delete projNonlinear;
-
-        // Process linear beta residual distribution with same improvements
-        TH1D *projLinear = hLinearResVsMC->ProjectionY(Form("projL_%d", bin), binLow, binHigh, "e");
-        Int_t projLEntries = projLinear->GetEntries();
-
-        if (projLEntries)
-        {
-            projLinear->Fit("gaus", "Q", "", yMinRes, yMaxRes);
-            TF1 *fitL = projLinear->GetFunction("gaus");
-            if (fitL && fitL->GetProb() > 0.01)
-            {
-                linearMean[bin] = fitL->GetParameter(1);
-                linearError[bin] = fitL->GetParameter(2);
-            }
-            else
-            {
-                linearMean[bin] = projLinear->GetMean();
-                linearError[bin] = projLinear->GetRMS();
-            }
-        }
-        else
-        {
-            linearMean[bin] = 0;
-            linearError[bin] = 0;
-        }
-        delete projLinear;
-
-        // Print data in aligned columns using tabs and store weights
-        nonlinearWeight[bin] = projNLEntries;
-        linearWeight[bin] = projLEntries;
-        printf("%d\t%.6f\t%d\t%d\t%.6f\t%.6f\n",
-               bin, binCenter, projNLEntries, projLEntries,
-               nonlinearMean[bin], linearMean[bin]);
-    }
-
-    // Create canvas with multiple pages
-    TCanvas *c1 = new TCanvas("c1", "Non-linear Beta Residuals", 3508, 2480);
-    c1->SetLeftMargin(0.16);
-    c1->SetRightMargin(0.11);
-    c1->SetGridx();
-    c1->SetGridy();
-    c1->SetLogz();
-
-    hNonlinearResVsMC->Draw("COLZ");
-
-    // Perfect residual reference line (zero residual)
-    TF1 *perfectLine1 = new TF1("perfectLine1", "0", xMin, xMax);
-    perfectLine1->SetLineColor(kRed);
-    perfectLine1->SetLineStyle(2);
-    perfectLine1->Draw("SAME");
-
-    // Create and draw TGraphErrors for nonlinear residuals
-    TGraphErrors *grNonlinear = new TGraphErrors(nProfiles, mcBetaValues, nonlinearMean, 0, nonlinearError);
-    grNonlinear->SetMarkerStyle(20);
-    grNonlinear->SetMarkerColor(kBlack);
-    grNonlinear->SetMarkerSize(3.0);
-    grNonlinear->Draw("P");
-
-    c1->Print(outputName);
-
-    // Second page - Linear beta residuals
-    TCanvas *c2 = new TCanvas("c2", "Linear Beta Residuals", 3508, 2480);
-    c2->SetLeftMargin(0.16);
-    c2->SetRightMargin(0.11);
-    c2->SetGridx();
-    c2->SetGridy();
-    c2->SetLogz();
-
-    hLinearResVsMC->Draw("COLZ");
-
-    // Perfect residual reference line (zero residual)
-    TF1 *perfectLine2 = new TF1("perfectLine2", "0", xMin, xMax);
-    perfectLine2->SetLineColor(kRed);
-    perfectLine2->SetLineStyle(2);
-    perfectLine2->Draw("SAME");
-
-    // Create and draw TGraphErrors for linear residuals
-    TGraphErrors *grLinear = new TGraphErrors(nProfiles, mcBetaValues, linearMean, 0, linearError);
-    grLinear->SetMarkerStyle(20);
-    grLinear->SetMarkerColor(kBlack);
-    grLinear->SetMarkerSize(3.0);
-    grLinear->Draw("P");
-
-    c2->Print(outputName);
-
-    // Third page - Comparison of TGraphErrors
-    TCanvas *c3 = new TCanvas("c3", "Beta Reconstruction Methods Comparison", 3508, 2480);
-    c3->SetLeftMargin(0.16);
-    c3->SetGridx();
-    c3->SetGridy();
-
-    // Create a frame for the comparison plot
-    TH2F *hFrame = new TH2F("hFrame", "Beta Reconstruction Methods Comparison;#beta_{MC};1/#beta_{rec} - 1/#beta_{MC}",
-                            100, xMin, xMax, 100, -0.2, 0.5);
-    hFrame->Draw();
-
-    // Define fit functions
-    TF1 *fNonlinear = new TF1("fNonlinear", "[0] * exp(-[1] * x)", xMin, xMax);
-    fNonlinear->SetParameters(0.1, 5.0, 0.0); // Initial parameters
-    fNonlinear->SetLineColor(kBlue);
-    fNonlinear->SetLineStyle(2);
-
-    TF1 *fLinear = new TF1("fLinear", "[0] * exp(-[1] * x)", xMin, xMax);
-    fLinear->SetParameters(0.1, 5.0, 0.0); // Initial parameters
-    fLinear->SetLineColor(kRed);
-    fLinear->SetLineStyle(2);
-
-    // Create and setup graphs with weights
-    grNonlinear->SetMarkerStyle(20);
-    grNonlinear->SetMarkerColor(kBlue);
-    grNonlinear->SetLineColor(kBlue);
-    grNonlinear->SetMarkerSize(3.0);
-
-    grNonlinear->Draw("LEP");
-    grLinear->Draw("LEP");
-
-    // Then update errors with weights for fitting only
-    TGraphErrors *grNonlinearFit = (TGraphErrors *)grNonlinear->Clone("grNonlinearFit");
-    for (int i = 0; i < nProfiles; i++)
-        if (nonlinearWeight[i] > 0)
-            grNonlinearFit->SetPointError(i, 0, nonlinearError[i] / sqrt(nonlinearWeight[i]));
-
-    grNonlinearFit->Fit(fNonlinear, "NQR"); // Q for quiet, R for using range
-    fNonlinear->Draw("SAME");
-
-    grLinear->SetMarkerStyle(21);
-    grLinear->SetMarkerColor(kRed);
-    grLinear->SetLineColor(kRed);
-    grLinear->SetMarkerSize(3.0);
-
-    // First draw points with original error bars
-    TGraphErrors *grLinearFit = (TGraphErrors *)grLinear->Clone("grLinearFit");
-    for (int i = 0; i < nProfiles; i++)
-        if (linearWeight[i] > 0)
-            grLinearFit->SetPointError(i, 0, linearError[i] / sqrt(linearWeight[i]));
-
-    grLinearFit->Fit(fLinear, "NQR");
-    fLinear->Draw("SAME");
-
-    // Add legend with fit equations
-    TLegend *legend = new TLegend(0.45, 0.65, 0.85, 0.85);
-    legend->AddEntry(grNonlinear, "Non-linear Method", "lp");
-    if (fNonlinear->GetParameter(1) > 0)
-        legend->AddEntry(fNonlinear, Form("Fit: %.2fe^{-%.2fx}", fNonlinear->GetParameter(0), fNonlinear->GetParameter(1)), "l");
-    else
-        legend->AddEntry(fNonlinear, Form("Fit: %.2fe^{%.2fx}", fNonlinear->GetParameter(0), -fNonlinear->GetParameter(1)), "l");
-    legend->AddEntry(grLinear, "Linear Method", "lp");
-    if (fLinear->GetParameter(1) > 0)
-        legend->AddEntry(fLinear, Form("Fit: %.2fe^{-%.2fx}", fLinear->GetParameter(0), fLinear->GetParameter(1)), "l");
-    else
-        legend->AddEntry(fLinear, Form("Fit: %.2fe^{%.2fx}", fLinear->GetParameter(0), -fLinear->GetParameter(1)), "l");
-    legend->SetBorderSize(0);
-    legend->Draw();
-
-    // Draw zero line
-    TF1 *zeroLine = new TF1("zeroLine", "0", xMin, xMax);
-    zeroLine->SetLineStyle(2);
-    zeroLine->SetLineColor(kGray + 2);
-    zeroLine->Draw("SAME");
-
-    // Add Z value and energyLossScale at the top center if available
+    // Create info text
     TPaveText *infoText = nullptr;
     if (zValue > 0)
     {
@@ -554,21 +303,183 @@ void plotBetaComparison(std::string fileName = "test.root",
         infoText->SetFillColor(0);
         infoText->SetBorderSize(0);
         infoText->AddText(Form("Z = %d, #zeta = %.3f", zValue, energyLossScale));
+    }
+
+    // Draw nonlinear beta vs MC beta
+    hNonlinearVsMC->Draw("COLZ");
+    perfectCorrelation->Draw("SAME");
+    if (infoText)
         infoText->Draw();
-    }
+    canvas->Print(outputName);
 
-    c3->Print(outputName);
-    c3->Print(Form("%s]", outputName)); // Close PDF file
+    // Draw linear beta vs MC beta
+    hLinearVsMC->Draw("COLZ");
+    perfectCorrelation->Draw("SAME");
+    if (infoText)
+        infoText->Draw();
+    canvas->Print(outputName);
 
-    // Clean up
-    if (zValue > 0)
+    // Fit
+    // ------------------------------------------------------------------------
+
+    // Arrays to store fit results
+    double mcBetaValues[nBinsX]{};
+    double nonlinearMean[nBinsX]{}, nonlinearError[nBinsX]{};
+    double linearMean[nBinsX]{}, linearError[nBinsX]{};
+
+    // Alias pointers for easier access
+    TH2F *hRes[2] = {hNonlinearResVsMC, hLinearResVsMC};
+    double *means[2] = {nonlinearMean, linearMean};
+    double *errors[2] = {nonlinearError, linearError};
+
+    // Create fit info text
+    TPaveText *fitInfoText = new TPaveText(0.3, 0.92, 0.7, 0.98, "NDC");
+    fitInfoText->SetFillColor(0);
+    fitInfoText->SetBorderSize(0);
+
+    // Create fit function
+    TF1 *fGaus = new TF1("fGaus", "gaus", yMinRes, yMaxRes);
+    fGaus->SetNpx(1000);
+
+    // Enable log y
+    canvas->SetLogy(1);
+
+    // Fit each column
+    for (int i = 0; i < nBinsX; ++i)
     {
-        delete infoText;
-    }
-    delete zeroLine;
+        double binCenter = xMin + (i + 0.5) * binWidth;
 
-    // Close and delete the file after all references are gone
-    file->Close();
+        mcBetaValues[i] = binCenter;
+
+        // Process each residual histogram
+        for (int j = 0; j < 2; ++j)
+        {
+            TH1D *proj = hRes[j]->ProjectionY(Form("proj_%d_%d", j, i), i + 1, i + 1);
+            Int_t projEntries = proj->GetEntries();
+
+            if (projEntries > 50)
+            {
+                fGaus->SetParameters(proj->GetMaximum(), proj->GetMean(), proj->GetRMS());
+                TFitResultPtr fitResult = proj->Fit(fGaus, "SQNR");
+
+                if (fitResult->Status() == 0)
+                {
+                    means[j][i] = fitResult->Parameter(1);
+                    errors[j][i] = fitResult->Parameter(2);
+                }
+                else
+                {
+                    means[j][i] = proj->GetMean();
+                    errors[j][i] = proj->GetRMS();
+                }
+
+                proj->Draw();
+                fGaus->Draw("SAME");
+                fitInfoText->Clear();
+                fitInfoText->AddText(
+                    Form("%s #beta: %.3f #mu: %.3f #sigma: %.3f",
+                         j ? "Linear" : "Nonlinear", mcBetaValues[i], means[j][i], errors[j][i]));
+                fitInfoText->Draw();
+                canvas->Print(outputName);
+            }
+            else
+            {
+                // Set to NaN, then TGraphErrors will ignore it
+                means[j][i] = TMath::QuietNaN();
+                errors[j][i] = TMath::QuietNaN();
+            }
+
+            delete proj;
+        }
+    }
+
+    // Disable log y
+    canvas->SetLogy(0);
+
+    // Print residuals
+    // ------------------------------------------------------------------------
+
+    // Create TGraphErrors for residuals
+    TGraphErrors *grNonlinear = new TGraphErrors(nBinsX, mcBetaValues, nonlinearMean, 0, nonlinearError);
+    grNonlinear->SetMarkerStyle(20);
+    grNonlinear->SetMarkerSize(3.0);
+
+    TGraphErrors *grLinear = new TGraphErrors(nBinsX, mcBetaValues, linearMean, 0, linearError);
+    grLinear->SetMarkerStyle(20);
+    grLinear->SetMarkerSize(3.0);
+
+    // Create fit functions & Fit
+    TF1 *fNonlinear = new TF1("fNonlinear", "[0] * exp(-[1] * x)", xMin, xMax);
+    fNonlinear->SetParameters(0.1, 5.0, 0.0);
+    fNonlinear->SetLineColor(kBlue);
+    fNonlinear->SetLineStyle(2);
+    grNonlinear->Fit(fNonlinear, "QNR");
+
+    TF1 *fLinear = new TF1("fLinear", "[0] * exp(-[1] * x)", xMin, xMax);
+    fLinear->SetParameters(0.1, 5.0, 0.0);
+    fLinear->SetLineColor(kRed);
+    fLinear->SetLineStyle(2);
+    grLinear->Fit(fLinear, "QNR");
+
+    // Create perfect residual reference line (zero residual)
+    TF1 *perfectResidual = new TF1("perfectResidual", "0", xMin, xMax);
+    perfectResidual->SetLineColor(kRed);
+    perfectResidual->SetLineStyle(2);
+
+    // Draw nonlinear residuals vs MC beta
+    hNonlinearResVsMC->Draw("COLZ");
+    perfectResidual->Draw("SAME");
+    grNonlinear->Draw("P");
+    if (infoText)
+        infoText->Draw();
+    canvas->Print(outputName);
+
+    // Draw linear residuals vs MC beta
+    hLinearResVsMC->Draw("COLZ");
+    perfectResidual->Draw("SAME");
+    grLinear->Draw("P");
+    if (infoText)
+        infoText->Draw();
+    canvas->Print(outputName);
+
+    // Draw comparison plot
+    hComparison->Draw("COLZ");
+    grNonlinear->SetMarkerColor(kRed);
+    grNonlinear->SetLineColor(kRed);
+    grNonlinear->Draw("LEP");
+    fNonlinear->Draw("SAME");
+
+    grLinear->SetMarkerColor(kBlue);
+    grLinear->SetLineColor(kBlue);
+    grLinear->Draw("LEP");
+    perfectResidual->Draw("SAME");
+    fLinear->Draw("SAME");
+
+    if (infoText)
+        infoText->Draw();
+
+    // Add legend
+    TLegend *legend = new TLegend(0.45, 0.65, 0.85, 0.85);
+
+    legend->AddEntry(grNonlinear, "Non-linear Method", "lp");
+    if (fNonlinear->GetParameter(1) > 0)
+        legend->AddEntry(fNonlinear, Form("Fit: %.2fe^{-%.2fx}", fNonlinear->GetParameter(0), fNonlinear->GetParameter(1)), "l");
+    else
+        legend->AddEntry(fNonlinear, Form("Fit: %.2fe^{%.2fx}", fNonlinear->GetParameter(0), -fNonlinear->GetParameter(1)), "l");
+
+    legend->AddEntry(grLinear, "Linear Method", "lp");
+    if (fLinear->GetParameter(1) > 0)
+        legend->AddEntry(fLinear, Form("Fit: %.2fe^{-%.2fx}", fLinear->GetParameter(0), fLinear->GetParameter(1)), "l");
+    else
+        legend->AddEntry(fLinear, Form("Fit: %.2fe^{%.2fx}", fLinear->GetParameter(0), -fLinear->GetParameter(1)), "l");
+
+    legend->SetBorderSize(0);
+    legend->Draw();
+
+    canvas->Print(outputName);
+
+    // Close PDF file
+    canvas->Print(Form("%s]", outputName));
 
     std::cout << "Beta residuals comparison plot saved to: " << outputName << std::endl;
 }

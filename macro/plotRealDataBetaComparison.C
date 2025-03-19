@@ -252,29 +252,21 @@ void plotRealDataBetaComparison(std::string fileName = "test.root",
     // Fit
     // ------------------------------------------------------------------------
 
-    // Total entries
-    Double_t totalEntries[4] = {
-        hNonlinearResVsRigidity->GetEntries(),
-        hLinearResVsRigidity->GetEntries(),
-        hNonlinearResVsBeta->GetEntries(),
-        hLinearResVsBeta->GetEntries()};
-
-    // Arrays to store fit results and weights
+    // Arrays to store fit results
     double betaValues[nBinsX]{}, rigidityValues[nBinsX]{};
-    double rigidityNLMean[nBinsX]{}, rigidityNLWeight[nBinsX]{}, rigidityNLError[nBinsX]{};
-    double rigidityLMean[nBinsX]{}, rigidityLWeight[nBinsX]{}, rigidityLError[nBinsX]{};
-    double betaNLMean[nBinsX]{}, betaNLWeight[nBinsX]{}, betaNLError[nBinsX]{};
-    double betaLMean[nBinsX]{}, betaLWeight[nBinsX]{}, betaLError[nBinsX]{};
+    double rigidityNLMean[nBinsX]{}, rigidityNLError[nBinsX]{};
+    double rigidityLMean[nBinsX]{}, rigidityLError[nBinsX]{};
+    double betaNLMean[nBinsX]{}, betaNLError[nBinsX]{};
+    double betaLMean[nBinsX]{}, betaLError[nBinsX]{};
 
     // Alias pointers for easier access
     TH2F *hRes[4] = {hNonlinearResVsRigidity, hLinearResVsRigidity, hNonlinearResVsBeta, hLinearResVsBeta};
     double *means[4] = {rigidityNLMean, rigidityLMean, betaNLMean, betaLMean};
     double *errors[4] = {rigidityNLError, rigidityLError, betaNLError, betaLError};
-    double *weights[4] = {rigidityNLWeight, rigidityLWeight, betaNLWeight, betaLWeight};
 
     // Fit each column
-    TF1 *gaus = new TF1("gaus", "gaus", yMinRes, yMaxRes);
-    gaus->SetParLimits(1, yMinRes, yMaxRes);
+    TF1 *fGaus = new TF1("fGaus", "gaus", yMinRes, yMaxRes);
+    fGaus->SetParLimits(1, yMinRes, yMaxRes);
     for (int i = 0; i < nBinsX; ++i)
     {
         double rigidityLower = TMath::Log10(rigidityBins[i]);
@@ -292,15 +284,15 @@ void plotRealDataBetaComparison(std::string fileName = "test.root",
             TH1D *proj = hRes[j]->ProjectionY(Form("proj_%d_%d", j, i), i + 1, i + 1);
             Int_t projEntries = proj->GetEntries();
 
-            if (projEntries > 1e-3 * totalEntries[j])
+            if (projEntries > 10)
             {
-                gaus->SetParameters(proj->GetMaximum(), proj->GetMean(), proj->GetRMS());
-                TFitResultPtr fitResult = proj->Fit(gaus, "QS");
+                fGaus->SetParameters(proj->GetMaximum(), proj->GetMean(), proj->GetRMS());
+                TFitResultPtr fitResult = proj->Fit(fGaus, "QS");
 
                 if (fitResult->Status() == 0)
                 {
                     means[j][i] = fitResult->Parameter(1);
-                    errors[j][i] = fitResult->ParError(1);
+                    errors[j][i] = fitResult->Parameter(2);
                 }
                 else
                 {
@@ -313,7 +305,6 @@ void plotRealDataBetaComparison(std::string fileName = "test.root",
             // canvas->Print(outputName);
 
             delete proj;
-            weights[j][i] = projEntries;
         }
     }
 
@@ -401,10 +392,6 @@ void plotRealDataBetaComparison(std::string fileName = "test.root",
 
     // Close PDF file
     canvas->Print(Form("%s]", outputName));
-
-    // Close and delete the file after all references are gone
-    file->Close();
-    delete file;
 
     std::cout << "Real data beta residuals comparison plot saved to: " << outputName << std::endl;
 }
