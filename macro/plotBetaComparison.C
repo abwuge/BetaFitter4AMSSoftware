@@ -152,7 +152,7 @@ void plotBetaComparison(std::string fileName = "test.root",
     if (!outputName)
     {
         if (zValue > 0 && energyLossScale > 0)
-            actualOutputName = Form("test_Z%d_ELS%.1f.pdf", zValue, energyLossScale);
+            actualOutputName = Form("test_beta_Z%d_zeta%.3f.pdf", zValue, energyLossScale);
         else
             actualOutputName = "test_beta_comparison.pdf";
         outputName = actualOutputName.c_str();
@@ -293,7 +293,7 @@ void plotBetaComparison(std::string fileName = "test.root",
         infoText1 = new TPaveText(0.2, 0.92, 0.8, 0.98, "NDC");
         infoText1->SetFillColor(0);
         infoText1->SetBorderSize(0);
-        infoText1->AddText(Form("Z = %d, Energy Loss Scale = %.1f", zValue, energyLossScale));
+        infoText1->AddText(Form("Z = %d, #zeta = %.3f", zValue, energyLossScale));
         infoText1->Draw();
     }
 
@@ -324,7 +324,7 @@ void plotBetaComparison(std::string fileName = "test.root",
         infoText2 = new TPaveText(0.2, 0.92, 0.8, 0.98, "NDC");
         infoText2->SetFillColor(0);
         infoText2->SetBorderSize(0);
-        infoText2->AddText(Form("Z = %d, Energy Loss Scale = %.1f", zValue, energyLossScale));
+        infoText2->AddText(Form("Z = %d, #zeta = %.3f", zValue, energyLossScale));
         infoText2->Draw();
     }
 
@@ -387,7 +387,7 @@ void plotBetaComparison(std::string fileName = "test.root",
 
         if (projLEntries)
         {
-            projLinear->Fit("gaus", "QN", "", yMinRes, yMaxRes);
+            projLinear->Fit("gaus", "Q", "", yMinRes, yMaxRes);
             TF1 *fitL = projLinear->GetFunction("gaus");
             if (fitL && fitL->GetProb() > 0.01)
             {
@@ -547,7 +547,7 @@ void plotBetaComparison(std::string fileName = "test.root",
         infoText = new TPaveText(0.2, 0.92, 0.8, 0.98, "NDC");
         infoText->SetFillColor(0);
         infoText->SetBorderSize(0);
-        infoText->AddText(Form("Z = %d, Energy Loss Scale = %.1f", zValue, energyLossScale));
+        infoText->AddText(Form("Z = %d, #zeta = %.3f", zValue, energyLossScale));
         infoText->Draw();
     }
 

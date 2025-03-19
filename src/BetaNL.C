@@ -79,6 +79,28 @@ BetaNLPars::BetaNLPars(AMSPoint pos, AMSDir dir, double beta, double mass, int c
         std::cerr << "Info in <BetaNLPars::BetaNLPars>: Charge is zero!" << std::endl;
 }
 
+double BetaNL::BetaZ0()
+{
+    double beta = Beta();
+    double energy = _pars->_mass / TMath::Sqrt(1 - beta * beta);
+
+    energy -= (_pars->_energyDeposited[0] + _pars->_energyDeposited[1]) * _energyLossScale;
+
+    double momentum = TMath::Sqrt(energy * energy - _pars->_mass * _pars->_mass);
+    return momentum / energy;
+}
+
+double BetaNL::BetaS4()
+{
+    double beta = Beta();
+    double energy = _pars->_mass / TMath::Sqrt(1 - beta * beta);
+
+    energy -= (_pars->_energyDeposited[0] + _pars->_energyDeposited[1] + _pars->_energyDeposited[2]) * _energyLossScale;
+
+    double momentum = TMath::Sqrt(energy * energy - _pars->_mass * _pars->_mass);
+    return momentum / energy;
+}
+
 double BetaNL::EnergyLossScale(double mcBeta)
 {
     ROOT::Math::Minimizer *minimizer = ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad");
@@ -162,7 +184,7 @@ std::vector<double> BetaNL::propagate(const double beta) const
         // Propagate to this TOF layer
         // ------------------------------------------
         // Calculate path length
-        // TODO: In TrProp::Propagate -> TrProp::Interpolate -> TrProp::VCFitPar, 
+        // TODO: In TrProp::Propagate -> TrProp::Interpolate -> TrProp::VCFitPar,
         // change `if (fabs(h) > steps && imat++ == 0) { ... }` to `if (fabs(h) > steps && imat++ == 0 && m55) { ... }`
         // may improve the performance and do NOT change the result.
         double length = propagator.Propagate(zTOF[i]);
@@ -231,23 +253,23 @@ double BetaNL::scaleChi2(const double *params, const double mcBeta)
 
 /**
  * @brief Performs β⁻¹ reconstruction using Minuit2 optimization framework.
- * 
+ *
  * Mathematical formulation:
- * 
+ *
  *   χ² = ∑[(t_reco - (t_tofMeasured - timeOffset))² / hitTimeError²]
- *   
+ *
  * Where:
  *   - t_reco:      Reconstructed time from particle hypothesis
  *   - timeOffset:  Detector timing calibration constant (ns)
  *   - hitTimeError: Timing resolution (σ) of the detection system
- * 
+ *
  * @note Critical design choices:
- * 
+ *
  * 1. Variable selection:
  *    - Uses β⁻¹ (1/β) as minimization parameter instead of β because:
  *      a) Better Hessian matrix condition number in relativistic regime
  *      b) Maintains linearity in dE/dx relationships
- * 
+ *
  * @see Minuit2 documentation: https://root.cern.ch/doc/master/Minuit2Page.html
  */
 double BetaNL::reconstruct()

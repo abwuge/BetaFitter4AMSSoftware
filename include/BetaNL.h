@@ -248,6 +248,24 @@ public:
      */
     double InvBeta() { return reconstruct(); }
 
+    /**
+     * Get the reconstructed beta value at TOF layer S1
+     * @return Reconstructed beta value at TOF layer S1
+     */
+    double BetaS1() {return Beta(); };
+
+    /**
+     * Get the reconstructed beta value at z = 0
+     * @return Reconstructed beta value at z = 0
+     */
+    double BetaZ0();
+
+    /**
+     * Get the reconstructed beta value at TOF layer S4
+     * @return Reconstructed beta value at TOF layer S4
+     */
+    double BetaS4();
+
     // Functions
     // ---------------------------------------------------------------------------
 

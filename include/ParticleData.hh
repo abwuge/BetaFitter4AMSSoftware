@@ -4,10 +4,12 @@
 struct ParticleData
 {
     // Particle properties
-    float mass;       // Mass
-    float charge;     // Charge
-    float momentum;   // Momentum
-    float betaLinear; // Reconstructed beta value
+    float mass;          // Mass
+    float charge;        // Charge
+    float momentum;      // Momentum
+    float betaLinear;    // Reconstructed beta value using linear approximation
+    float innerRigidity; // Inner tracker rigidity
+    float betaRigidity;  // Reconstructed beta value using rigidity
 
     // Particle hit information (TOF)
     float initDir[3];
@@ -40,6 +42,8 @@ struct ParticleData
                      charge(0),
                      momentum(0.0f),
                      betaLinear(0.0f),
+                     innerRigidity(0.0f),
+                     betaRigidity(0.0f),
                      initDir{},
                      initCoo{},
                      TOF_hitZ{},

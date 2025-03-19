@@ -58,6 +58,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     float tk_pos[9][3] = {0};
     float tk_q[2] = {0};
     float tk_qin[2][3] = {0};
+    float tk_rigidity1[3][3][7]{};
 
     // Set branch addresses
     if (tree->GetBranch("mpar"))
@@ -77,12 +78,16 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     tree->SetBranchAddress("tk_pos", tk_pos);
     tree->SetBranchAddress("tk_q", tk_q);
     tree->SetBranchAddress("tk_qin", tk_qin);
+    tree->SetBranchAddress("tk_rigidity1", tk_rigidity1);
 
     // Read all entries
     Long64_t nEntries = tree->GetEntries();
     for (Long64_t i = 0; i < nEntries; ++i)
     {
         tree->GetEntry(i);
+
+        if (mevmom1[4] == -1000)
+            continue;
 
         ParticleData data;
         if (isMC)
@@ -135,8 +140,11 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
         }
 
         data.charge = (int)((tk_qin[0][2] < 2.5 ? tk_q[1] : tk_qin[0][2]) + 0.5);
+        data.innerRigidity = tk_rigidity1[1][2][1];
         data.mass = 2 * data.charge * 0.9314941; // Suppose its' number of neutron equals to number of proton
         data.betaLinear = tof_betah;
+        float momentumRigidity = data.innerRigidity * data.charge;
+        data.betaRigidity = momentumRigidity / TMath::Sqrt(momentumRigidity * momentumRigidity + data.mass * data.mass);
         data.momentum = data.mass * data.betaLinear / sqrt(1 - data.betaLinear * data.betaLinear);
 
         particles.push_back(data);
@@ -167,26 +175,27 @@ bool Util::saveBeta(const std::string &inputFile, const std::string &outputFile,
     // Create TTree
     TTree *tree = new TTree("betaTree", "Beta Reconstruction Results");
     double mcBeta = 0;
+    double innerRigidity = 0;
+    double betaRigidity = 0;
     double linearBeta = 0;
     double nonlinearBeta = 0;
+    int Z = 0;
 
     // Set up branches
     tree->Branch("mcBeta", &mcBeta, "mcBeta/D");
+    tree->Branch("innerRigidity", &innerRigidity, "innerRigidity/D");
+    tree->Branch("betaRigidity", &betaRigidity, "betaRigidity/D");
     tree->Branch("linearBeta", &linearBeta, "linearBeta/D");
     tree->Branch("nonlinearBeta", &nonlinearBeta, "nonlinearBeta/D");
+    tree->Branch("Z", &Z, "Z/I");
 
     // Process each particle
     for (const auto &particle : particles)
     {
-        // Skip invalid particles
-        if (!particle.isMC)
-            continue;
-
-        if (particle.mcInitCoo[0] == -1000)
-            continue;
-
         // Get beta values
         mcBeta = particle.mcBeta;
+        innerRigidity = particle.innerRigidity;
+        betaRigidity = particle.betaRigidity;
         linearBeta = particle.betaLinear;
         nonlinearBeta =
             BetaNL(
@@ -202,10 +211,7 @@ bool Util::saveBeta(const std::string &inputFile, const std::string &outputFile,
                     particle.TOF_hitTimeError),
                 energyLossScale)
                 .Beta();
-
-        // Skip invalid reconstructions
-        if (nonlinearBeta <= 0 || linearBeta <= 0)
-            continue;
+        Z = particle.charge;
 
         // Fill tree
         tree->Fill();
@@ -439,7 +445,7 @@ bool Util::saveEnergyLossScale(const std::string &inputFile, const std::string &
 
     // Create TTree
     TTree *tree = new TTree("scaleTree", "Energy Loss Scale Factor");
-    
+
     float energyLossScale;
     float mcBeta;
     float position[3];
@@ -461,17 +467,17 @@ bool Util::saveEnergyLossScale(const std::string &inputFile, const std::string &
 
         // Get energy loss scale factor
         energyLossScale = BetaNL(
-                             BetaNLPars(
-                                 AMSPoint(particle.initCoo[0], particle.initCoo[1], particle.initCoo[2]),
-                                 AMSDir(particle.initDir[0], particle.initDir[1], particle.initDir[2]),
-                                 particle.betaLinear,
-                                 particle.mass,
-                                 particle.charge,
-                                 particle.TOF_hitZ,
-                                 particle.TOF_hitEdep,
-                                 particle.TOF_hitTime,
-                                 particle.TOF_hitTimeError))
-                             .EnergyLossScale(particle.mcBeta);
+                              BetaNLPars(
+                                  AMSPoint(particle.initCoo[0], particle.initCoo[1], particle.initCoo[2]),
+                                  AMSDir(particle.initDir[0], particle.initDir[1], particle.initDir[2]),
+                                  particle.betaLinear,
+                                  particle.mass,
+                                  particle.charge,
+                                  particle.TOF_hitZ,
+                                  particle.TOF_hitEdep,
+                                  particle.TOF_hitTime,
+                                  particle.TOF_hitTimeError))
+                              .EnergyLossScale(particle.mcBeta);
         mcBeta = particle.mcBeta;
         position[0] = particle.initCoo[0];
         position[1] = particle.initCoo[1];
