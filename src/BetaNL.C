@@ -179,6 +179,8 @@ std::vector<double> BetaNL::propagate(const double beta) const
         // Update particle rigidity
         double momentum = TMath::Sqrt(energy * energy - mass2);
         double rigidity = momentum * invCharge;
+        if (std::isnan(rigidity) || std::isinf(rigidity))
+            rigidity = 0;
         propagator.SetRigidity(rigidity);
 
         // Propagate to this TOF layer
@@ -192,7 +194,7 @@ std::vector<double> BetaNL::propagate(const double beta) const
             break;
 
         // Calculate hit time
-        hitTimes[i] = hitTimes[i - 1] + length / (BetaNLPars::SPEED_OF_LIGHT * momentum / energy);
+        hitTimes[i] = hitTimes[i - 1] + length / (BetaNLPars::SPEED_OF_LIGHT * (beta >= 1 ? beta : momentum / energy));
     }
 
     return hitTimes;
@@ -282,8 +284,8 @@ double BetaNL::reconstruct()
     ROOT::Math::Functor functor(this, &BetaNL::betaChi2, 2);
     minimizer->SetFunction(functor);
 
-    double lowerInvBeta = 1 + 1e-10; // beta < 1
-    double upperInvBeta = 3;         // beta > 0.33
+    double lowerInvBeta = 0.6; // beta < 1.67
+    double upperInvBeta = 3;   // beta > 0.33
     double initialInvBeta = TMath::Range(lowerInvBeta, upperInvBeta, 1 / _pars->_beta);
     minimizer->SetLimitedVariable(0, "invBeta", initialInvBeta, 1e-5, lowerInvBeta, upperInvBeta);
 

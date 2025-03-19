@@ -222,18 +222,21 @@ void plotBetaComparison(std::string fileName = "test.root",
 
     // Get ranges for residuals using quantiles
     auto nonlinearResRange = getQuantileRange("nonlinearBeta", 1e-4, 1 - 1e-4);
-    auto linearResRange = getQuantileRange("linearBeta", 0.001, 1 - 1e-6);
+    // auto linearResRange = getQuantileRange("linearBeta", 1e-4, 1 - 1e-4);
 
     // Use independent ranges for first two pages
     double yMinResNL = nonlinearResRange.first;
     double yMaxResNL = nonlinearResRange.second;
 
-    double yMinResL = linearResRange.first;
-    double yMaxResL = linearResRange.second;
+    // double yMinResL = linearResRange.first;
+    // double yMaxResL = linearResRange.second;
 
-    // Use the wider range for the comparison page
-    double yMinRes = std::min(nonlinearResRange.first, linearResRange.first);
-    double yMaxRes = std::max(nonlinearResRange.second, linearResRange.second);
+    double yMinResL = yMinResNL;
+    double yMaxResL = yMaxResNL;
+
+    // // Use the wider range for the comparison page
+    double yMinRes = std::min(yMinResNL, yMinResL);
+    double yMaxRes = std::max(yMaxResNL, yMaxResL);
 
     // Create histograms for the residuals plot with independent ranges
     TH2F *hNonlinearResVsMC = new TH2F("hNonlinearResVsMC",
@@ -254,9 +257,12 @@ void plotBetaComparison(std::string fileName = "test.root",
     double yMinNL = nonlinearBetaRange.first;
     double yMaxNL = nonlinearBetaRange.second;
 
-    auto linearBetaRange = getQuantileRange("linearBeta", 1e-4, 0.99, false);
-    double yMinL = linearBetaRange.first;
-    double yMaxL = linearBetaRange.second;
+    // auto linearBetaRange = getQuantileRange("linearBeta", 1e-4, 1 - 1e-4, false);
+    // double yMinL = linearBetaRange.first;
+    // double yMaxL = linearBetaRange.second;
+
+    double yMinL = yMinNL;
+    double yMaxL = yMaxNL;
 
     // Create 2D histograms for beta comparison
     TH2F *hNonlinearVsMC = new TH2F("hNonlinearVsMC",
@@ -473,7 +479,7 @@ void plotBetaComparison(std::string fileName = "test.root",
 
     // Create a frame for the comparison plot
     TH2F *hFrame = new TH2F("hFrame", "Beta Reconstruction Methods Comparison;#beta_{MC};1/#beta_{rec} - 1/#beta_{MC}",
-                            100, xMin, xMax, 100, yMinRes, yMaxRes);
+                            100, xMin, xMax, 100, -0.2, 0.5);
     hFrame->Draw();
 
     // Define fit functions
