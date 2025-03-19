@@ -212,15 +212,18 @@ std::vector<double> BetaNL::propagate(const double beta) const
 }
 
 /**
- * @param params[0] Inverse beta (1/beta)
+ * @param params[0] beta
  * @param params[1] Time offset
  */
 double BetaNL::betaChi2(const double *params)
 {
-    const double invBeta = params[0];
+    const double beta = params[0];
     _timeOffset = params[1];
 
-    const double *const hitTimeReconstructed = propagate(1 / invBeta).data();
+    if (beta > 1)
+        std::cout << beta << std::endl;
+
+    const double *const hitTimeReconstructed = propagate(beta).data();
     const double *const hitTimeMeasured = _pars->_hitTime.data();
     const double *const hitTimeError = _pars->_hitTimeError.data();
 
@@ -287,8 +290,8 @@ double BetaNL::scaleChi2(const double *params, const double mcBeta)
  */
 double BetaNL::reconstruct()
 {
-    if (_invBeta)
-        return *_invBeta;
+    if (_beta)
+        return *_beta;
 
     ROOT::Math::Minimizer *minimizer = ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad");
 
@@ -301,10 +304,10 @@ double BetaNL::reconstruct()
      * if beta > 1, we will treat the particle as having the opposite charge
      * and consider its actual beta to be 1 - (beta - 1).
      */
-    double lowerInvBeta = 0.6; // beta < 1.11
-    double upperInvBeta = 3;   // beta > 0.33
-    double initialInvBeta = TMath::Range(lowerInvBeta, upperInvBeta, 1 / _pars->_beta);
-    minimizer->SetLimitedVariable(0, "invBeta", initialInvBeta, 1e-5, lowerInvBeta, upperInvBeta);
+    double lowerBeta = 0.33;
+    double upperBeta = 1.67;
+    double initialBeta = TMath::Range(lowerBeta, upperBeta, _pars->_beta);
+    minimizer->SetLimitedVariable(0, "beta", initialBeta, 1e-5, lowerBeta, upperBeta);
 
     double timeError = _pars->_hitTimeError[0];
     double initialTimeOffset = _pars->_hitTime[0];
@@ -314,8 +317,8 @@ double BetaNL::reconstruct()
 
     minimizer->Minimize();
 
-    _invBeta = std::make_shared<double>(minimizer->X()[0]);
+    _beta = std::make_shared<double>(minimizer->X()[0]);
     _timeOffset = minimizer->X()[1];
 
-    return *_invBeta;
+    return *_beta;
 }

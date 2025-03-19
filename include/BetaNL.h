@@ -240,13 +240,7 @@ public:
      * Get the reconstructed beta value by the non-linear method
      * @return Reconstructed beta value
      */
-    double Beta() { return 1 / InvBeta(); }
-
-    /**
-     * Get the reconstructed 1/beta value by the non-linear method
-     * @return Reconstructed 1/beta value
-     */
-    double InvBeta() { return reconstruct(); }
+    double Beta() { return reconstruct(); }
 
     /**
      * Get the reconstructed beta value at TOF layer S1
@@ -288,7 +282,7 @@ private:
 
 private:
     std::shared_ptr<BetaNLPars> _pars;          // Parameters for the beta non-linear reconstruction
-    std::shared_ptr<double> _invBeta = nullptr; // Reconstructed 1/beta value
+    std::shared_ptr<double> _beta = nullptr; // Reconstructed 1/beta value
     double _energyLossScale = 2;                // Energy loss scale factor
     double _timeOffset = 0;                     // Reconstructed time offset in ns
 };
