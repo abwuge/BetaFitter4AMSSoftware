@@ -44,21 +44,22 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     }
 
     // Variables to read from tree
-    bool isMC = false;
-    int mpar = 0;
-    float mch = 0.0f;
-    float mevcoo1[21][3] = {0};
-    float mevdir1[21][3] = {0};
-    float mevmom1[21] = {0};
-    float tof_betah = 0.0f;
-    float tof_tl[4] = {0};
-    float tof_pos[4][3] = {0};
-    float tof_dir[4][3] = {0};
-    float tof_edep[4] = {0};
-    float tk_pos[9][3] = {0};
-    float tk_q[2] = {0};
-    float tk_qin[2][3] = {0};
+    bool isMC{};
+    int mpar{};
+    float mch{};
+    float mevcoo1[21][3]{};
+    float mevdir1[21][3]{};
+    float mevmom1[21]{};
+    float tof_betah{};
+    float tof_tl[4]{};
+    float tof_pos[4][3]{};
+    float tof_dir[4][3]{};
+    float tof_edep[4]{};
+    float tk_pos[9][3]{};
+    float tk_q[2]{};
+    float tk_qin[2][3]{};
     float tk_rigidity1[3][3][7]{};
+    float tof_leng[4]{};
 
     // Set branch addresses
     if (tree->GetBranch("mpar"))
@@ -79,6 +80,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     tree->SetBranchAddress("tk_q", tk_q);
     tree->SetBranchAddress("tk_qin", tk_qin);
     tree->SetBranchAddress("tk_rigidity1", tk_rigidity1);
+    tree->SetBranchAddress("tof_leng", tof_leng);
 
     // Read all entries
     Long64_t nEntries = tree->GetEntries();
@@ -129,6 +131,9 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
             data.TOF_hitTimeError[j] = 0.1544809;
             data.TOF_hitEdep[j] = tof_edep[j] * 1e-3;
         }
+
+        for (int j = 1; j < ParticleData::TOF_MAX_HITS; ++j)
+            data.TOF_length[j] = tof_leng[j] - tof_leng[j - 1];
 
         for (int j = 0; j < ParticleData::TRACKER_MAX_HITS; ++j)
         {
@@ -208,7 +213,8 @@ bool Util::saveBeta(const std::string &inputFile, const std::string &outputFile,
                     particle.TOF_hitZ,
                     particle.TOF_hitEdep,
                     particle.TOF_hitTime,
-                    particle.TOF_hitTimeError),
+                    particle.TOF_hitTimeError,
+                    particle.TOF_length),
                 energyLossScale)
                 .Beta();
         Z = particle.charge;
@@ -476,7 +482,8 @@ bool Util::saveEnergyLossScale(const std::string &inputFile, const std::string &
                                   particle.TOF_hitZ,
                                   particle.TOF_hitEdep,
                                   particle.TOF_hitTime,
-                                  particle.TOF_hitTimeError))
+                                  particle.TOF_hitTimeError,
+                                  particle.TOF_length))
                               .EnergyLossScale(particle.mcBeta);
         mcBeta = particle.mcBeta;
         position[0] = particle.initCoo[0];

@@ -63,13 +63,15 @@ BetaNLPars::BetaNLPars(
     const float zTOF[nTOF],
     const float energyDeposited[nTOF],
     const float hitTime[nTOF],
-    const float hitTimeError[nTOF])
+    const float hitTimeError[nTOF],
+    const float pathLength[nTOF])
     : BetaNLPars(pos, dir, beta, mass, charge)
 {
     _zTOF.assign(zTOF, zTOF + nTOF);
     _energyDeposited.assign(energyDeposited, energyDeposited + nTOF);
     _hitTime.assign(hitTime, hitTime + nTOF);
     _hitTimeError.assign(hitTimeError, hitTimeError + nTOF);
+    _pathLength.assign(pathLength, pathLength + nTOF);
 }
 
 BetaNLPars::BetaNLPars(AMSPoint pos, AMSDir dir, double beta, double mass, int charge)
@@ -189,7 +191,8 @@ std::vector<double> BetaNL::propagate(const double beta) const
         // TODO: In TrProp::Propagate -> TrProp::Interpolate -> TrProp::VCFitPar,
         // change `if (fabs(h) > steps && imat++ == 0) { ... }` to `if (fabs(h) > steps && imat++ == 0 && m55) { ... }`
         // may improve the performance and do NOT change the result.
-        double length = propagator.Propagate(zTOF[i]);
+        // double length = propagator.Propagate(zTOF[i]);
+        double length = _pars->_pathLength[i];
         if (length < 0)
             break;
 

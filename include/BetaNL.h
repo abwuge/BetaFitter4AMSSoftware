@@ -113,7 +113,8 @@ public:
         const float zTOF[nTOF],
         const float energyDeposited[nTOF],
         const float hitTime[nTOF],
-        const float hitTimeError[nTOF]);
+        const float hitTimeError[nTOF],
+        const float pathLength[nTOF]);
 
     /**
      * Destructor
@@ -197,6 +198,7 @@ private:
     std::vector<double> _energyDeposited; // Energy deposited in GeV at TOF hits
     std::vector<double> _hitTime;         // Hit times in ns at TOF hits
     std::vector<double> _hitTimeError;    // Hit time errors in ns at TOF hits
+    std::vector<double> _pathLength;      // Path length in cm at TOF hits
 
     friend class BetaNL;
 };
@@ -252,7 +254,7 @@ public:
      * Get the reconstructed beta value at TOF layer S1
      * @return Reconstructed beta value at TOF layer S1
      */
-    double BetaS1() {return Beta(); };
+    double BetaS1() { return Beta(); };
 
     /**
      * Get the reconstructed beta value at z = 0

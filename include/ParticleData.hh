@@ -19,6 +19,7 @@ struct ParticleData
     float TOF_hitTime[TOF_MAX_HITS];
     float TOF_hitTimeError[TOF_MAX_HITS];
     float TOF_hitEdep[TOF_MAX_HITS];
+    float TOF_length[TOF_MAX_HITS];
 
     // Particle hit information (Tracker)
     static constexpr int TRACKER_MAX_HITS = 9;
@@ -50,6 +51,7 @@ struct ParticleData
                      TOF_hitTime{},
                      TOF_hitTimeError{},
                      TOF_hitEdep{},
+                     TOF_length{},
                      TRACKER_hitX{},
                      TRACKER_hitY{},
                      TRACKER_hitZ{},
