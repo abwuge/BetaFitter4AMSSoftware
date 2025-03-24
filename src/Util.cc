@@ -9,6 +9,7 @@
 #include <TCanvas.h>
 #include <TView.h>
 #include <TText.h>
+#include <chrono>
 
 // Implementation of getMass function
 float Util::getMass(int pdgId, double charge)
@@ -205,12 +206,8 @@ bool Util::saveBeta(const std::string &inputFile, const std::string &outputFile,
         nonlinearBeta =
             BetaNL(
                 BetaNLPars(
-                    AMSPoint(particle.initCoo[0], particle.initCoo[1], particle.initCoo[2]),
-                    AMSDir(particle.initDir[0], particle.initDir[1], particle.initDir[2]),
                     particle.betaLinear,
                     particle.mass,
-                    particle.charge,
-                    particle.TOF_hitZ,
                     particle.TOF_hitEdep,
                     particle.TOF_hitTime,
                     particle.TOF_hitTimeError,
@@ -330,14 +327,18 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
     int tof_qs = 0; // Q Status (1111: all unoverlapped, 0000: all overlapped, left to right: S1, S2, S3, S4)
     int mpar = 0;
     float mch = 0.0f;
-    float mevmom1[21] = {0};
-    float tof_edep[4] = {0};
+    float mevmom1[21]{};
+    float tof_edep[4]{};
+    float mevcoo1[21][3]{};
+    float mevdir1[21][3]{};
 
     treeIn->SetBranchAddress("tof_qs", &tof_qs);
     treeIn->SetBranchAddress("mpar", &mpar);
     treeIn->SetBranchAddress("mch", &mch);
     treeIn->SetBranchAddress("mevmom1", mevmom1);
     treeIn->SetBranchAddress("tof_edep", tof_edep);
+    treeIn->SetBranchAddress("mevcoo1", mevcoo1);
+    treeIn->SetBranchAddress("mevdir1", mevdir1);
 
     TFile *fileOut = new TFile(outputFile.c_str(), "RECREATE");
     if (!fileOut || fileOut->IsZombie())
@@ -357,6 +358,8 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
     float energyLossS2__S3 = 0.0;     // energy loss from after S2 to before S3
     float energyLossS2S3_Total = 0.0; // energy loss from after S2 to before S3, normalized to total energy loss
     float mcBeta = 0.0;               // Monte Carlo beta
+    float position[3]{};
+    float direction[3]{};
 
     treeOut->Branch("energyDepositedS1S2", &energyDepositedS1S2, "energyDepositedS1S2/F");
     treeOut->Branch("energyDepositedTotal", &energyDepositedTotal, "energyDepositedTotal/F");
@@ -368,6 +371,8 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
     treeOut->Branch("energyLossS2S3_Total", &energyLossS2S3_Total, "energyLossS2S3_Total/F");
     treeOut->Branch("mcBeta", &mcBeta, "mcBeta/F");
     treeOut->Branch("tof_qs", &tof_qs, "tof_qs/I");
+    treeOut->Branch("position", position, "position[3]/F");
+    treeOut->Branch("direction", direction, "direction[3]/F");
 
     // Read all entries
     Long64_t nEntries = treeIn->GetEntries();
@@ -411,6 +416,12 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
         energyLossS2__S3 = kineticEnergy[2] - kineticEnergy[3];
         energyLossS2S3_Total = energyLossS2__S3 / energyLoss_S1S4_;
         mcBeta = mevmom1[4] / sqrt(mevmom1[4] * mevmom1[4] + mass * mass);
+
+        for (int i = 0; i < 3; ++i)
+        {
+            position[i] = mevcoo1[4][i];
+            direction[i] = mevdir1[4][i];
+        }
 
         treeOut->Fill();
     }
@@ -474,12 +485,8 @@ bool Util::saveEnergyLossScale(const std::string &inputFile, const std::string &
         // Get energy loss scale factor
         energyLossScale = BetaNL(
                               BetaNLPars(
-                                  AMSPoint(particle.initCoo[0], particle.initCoo[1], particle.initCoo[2]),
-                                  AMSDir(particle.initDir[0], particle.initDir[1], particle.initDir[2]),
                                   particle.betaLinear,
                                   particle.mass,
-                                  particle.charge,
-                                  particle.TOF_hitZ,
                                   particle.TOF_hitEdep,
                                   particle.TOF_hitTime,
                                   particle.TOF_hitTimeError,
@@ -501,6 +508,56 @@ bool Util::saveEnergyLossScale(const std::string &inputFile, const std::string &
     tree->Write();
     outFile->Close();
     delete outFile;
+
+    return true;
+}
+
+bool Util::benchmarkBetaNL(const std::string &inputFile, const std::string &outputFile, double energyLossScale)
+{
+    // Load particle data from input file
+    std::vector<ParticleData> particles = Util::loadParticleData(inputFile);
+    if (particles.empty())
+    {
+        std::cerr << "Error: No particles loaded from input file" << std::endl;
+        return false;
+    }
+
+    std::cout << "Starting BetaNL::Beta() benchmark with " << particles.size() << " particles..." << std::endl;
+    std::cout << "Energy loss scale: " << energyLossScale << std::endl;
+
+    double totalTimeS = 0;
+    double averageTimeMs = 0;
+
+    for (const auto &particle : particles)
+    {
+        auto start = std::chrono::high_resolution_clock::now();
+
+        double betaValue =
+            BetaNL(
+                BetaNLPars(
+                    particle.betaLinear,
+                    particle.mass,
+                    particle.TOF_hitEdep,
+                    particle.TOF_hitTime,
+                    particle.TOF_hitTimeError,
+                    particle.TOF_length),
+                energyLossScale)
+                .Beta();
+
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+
+        std::cout << "Final beta value: " << betaValue << std::endl;
+
+        totalTimeS += elapsed.count();
+    }
+
+    averageTimeMs = totalTimeS * 1000 / particles.size();
+
+    // Display results
+    std::cout << "Benchmark completed with " << particles.size() << " particles" << std::endl;
+    std::cout << "Total time: " << totalTimeS << " seconds" << std::endl;
+    std::cout << "Average time per Beta() call: " << averageTimeMs << " milliseconds" << std::endl;
 
     return true;
 }

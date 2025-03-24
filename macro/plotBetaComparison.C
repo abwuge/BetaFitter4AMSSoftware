@@ -322,15 +322,24 @@ void plotBetaComparison(std::string fileName = "test.root",
     // Fit
     // ------------------------------------------------------------------------
 
-    // Arrays to store fit results
-    double mcBetaValues[nBinsX]{};
-    double nonlinearMean[nBinsX]{}, nonlinearError[nBinsX]{};
-    double linearMean[nBinsX]{}, linearError[nBinsX]{};
+    // Vectors to store fit results
+    std::vector<double> nonlinearMCBetaValues, linearMCBetaValues;
+    std::vector<double> nonlinearMeans, nonlinearErrors;
+    std::vector<double> linearMeans, linearErrors;
+
+    // Prepare vectors
+    nonlinearMCBetaValues.reserve(nBinsX);
+    nonlinearMeans.reserve(nBinsX);
+    nonlinearErrors.reserve(nBinsX);
+    linearMCBetaValues.reserve(nBinsX);
+    linearMeans.reserve(nBinsX);
+    linearErrors.reserve(nBinsX);
 
     // Alias pointers for easier access
     TH2F *hRes[2] = {hNonlinearResVsMC, hLinearResVsMC};
-    double *means[2] = {nonlinearMean, linearMean};
-    double *errors[2] = {nonlinearError, linearError};
+    std::vector<double> *mcBetaValues[2] = {&nonlinearMCBetaValues, &linearMCBetaValues};
+    std::vector<double> *means[2] = {&nonlinearMeans, &linearMeans};
+    std::vector<double> *errors[2] = {&nonlinearErrors, &linearErrors};
 
     // Create fit info text
     TPaveText *fitInfoText = new TPaveText(0.3, 0.92, 0.7, 0.98, "NDC");
@@ -339,6 +348,7 @@ void plotBetaComparison(std::string fileName = "test.root",
 
     // Create fit function
     TF1 *fGaus = new TF1("fGaus", "gaus", yMinRes, yMaxRes);
+    fGaus->SetParLimits(1, yMinRes, yMaxRes);
     fGaus->SetNpx(1000);
 
     // Enable log y
@@ -348,14 +358,16 @@ void plotBetaComparison(std::string fileName = "test.root",
     for (int i = 0; i < nBinsX; ++i)
     {
         double binCenter = xMin + (i + 0.5) * binWidth;
-
-        mcBetaValues[i] = binCenter;
+        bool isValid = false;
 
         // Process each residual histogram
         for (int j = 0; j < 2; ++j)
         {
             TH1D *proj = hRes[j]->ProjectionY(Form("proj_%d_%d", j, i), i + 1, i + 1);
             Int_t projEntries = proj->GetEntries();
+
+            fitInfoText->Clear();
+            proj->Draw();
 
             if (projEntries > 50)
             {
@@ -364,30 +376,29 @@ void plotBetaComparison(std::string fileName = "test.root",
 
                 if (fitResult->Status() == 0)
                 {
-                    means[j][i] = fitResult->Parameter(1);
-                    errors[j][i] = fitResult->Parameter(2);
+                    isValid = true;
+                    mcBetaValues[j]->push_back(binCenter);
+                    means[j]->push_back(fitResult->Parameter(1));
+                    errors[j]->push_back(fitResult->Parameter(2));
+
+                    fGaus->Draw("SAME");
+                    fitInfoText->AddText(
+                        Form("%s #beta: %.3f #mu: %.3f #sigma: %.3f",
+                             j ? "Linear" : "Nonlinear", binCenter,
+                             fitResult->Parameter(1), fitResult->Parameter(2)));
                 }
                 else
-                {
-                    means[j][i] = proj->GetMean();
-                    errors[j][i] = proj->GetRMS();
-                }
-
-                proj->Draw();
-                fGaus->Draw("SAME");
-                fitInfoText->Clear();
-                fitInfoText->AddText(
-                    Form("%s #beta: %.3f #mu: %.3f #sigma: %.3f",
-                         j ? "Linear" : "Nonlinear", mcBetaValues[i], means[j][i], errors[j][i]));
-                fitInfoText->Draw();
-                canvas->Print(outputName);
+                    fitInfoText->AddText(
+                        Form("%s #beta: %.3f FIT FAILED",
+                             j ? "Linear" : "Nonlinear", binCenter));
             }
             else
-            {
-                // Set to NaN, then TGraphErrors will ignore it
-                means[j][i] = TMath::QuietNaN();
-                errors[j][i] = TMath::QuietNaN();
-            }
+                fitInfoText->AddText(
+                    Form("%s #beta: %.3f Entries (%d) too low",
+                         j ? "Linear" : "Nonlinear", binCenter, projEntries));
+
+            fitInfoText->Draw();
+            canvas->Print(outputName);
 
             delete proj;
         }
@@ -400,24 +411,32 @@ void plotBetaComparison(std::string fileName = "test.root",
     // ------------------------------------------------------------------------
 
     // Create TGraphErrors for residuals
-    TGraphErrors *grNonlinear = new TGraphErrors(nBinsX, mcBetaValues, nonlinearMean, 0, nonlinearError);
+    TGraphErrors *grNonlinear = new TGraphErrors(nonlinearMCBetaValues.size(),
+                                                 nonlinearMCBetaValues.data(),
+                                                 nonlinearMeans.data(),
+                                                 nullptr,
+                                                 nonlinearErrors.data());
     grNonlinear->SetMarkerStyle(20);
     grNonlinear->SetMarkerSize(3.0);
 
-    TGraphErrors *grLinear = new TGraphErrors(nBinsX, mcBetaValues, linearMean, 0, linearError);
+    TGraphErrors *grLinear = new TGraphErrors(linearMCBetaValues.size(),
+                                              linearMCBetaValues.data(),
+                                              linearMeans.data(),
+                                              nullptr,
+                                              linearErrors.data());
     grLinear->SetMarkerStyle(20);
     grLinear->SetMarkerSize(3.0);
 
     // Create fit functions & Fit
     TF1 *fNonlinear = new TF1("fNonlinear", "[0] * exp(-[1] * x)", xMin, xMax);
     fNonlinear->SetParameters(0.1, 5.0, 0.0);
-    fNonlinear->SetLineColor(kBlue);
+    fNonlinear->SetLineColor(kRed);
     fNonlinear->SetLineStyle(2);
     grNonlinear->Fit(fNonlinear, "QNR");
 
     TF1 *fLinear = new TF1("fLinear", "[0] * exp(-[1] * x)", xMin, xMax);
     fLinear->SetParameters(0.1, 5.0, 0.0);
-    fLinear->SetLineColor(kRed);
+    fLinear->SetLineColor(kBlue);
     fLinear->SetLineStyle(2);
     grLinear->Fit(fLinear, "QNR");
 

@@ -3,7 +3,7 @@
 # Default maximum number of parallel processes
 Z=${1:-8}
 fitOption=${2:-0}
-energyLossScale=${3:-2.0}
+energyLossScale=${3:-1.0}
 MAX_PROCS=${4:-100}
 
 # Array to store child PIDs
@@ -78,7 +78,7 @@ done < "$INPUT_LIST"
 # Wait for all background processes to complete
 wait
 
-read -t 5 -p "Hadd all root files? [Y/n] " response
+read -t 0 -p "Hadd all root files? [Y/n] " response
 response=${response:-Y}
 if [[ $response =~ ^([yY][eE][sS]|[yY])$ ]]; then
     ./hadd.sh $RUN_NUM

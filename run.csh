@@ -4,7 +4,7 @@ source /nas01/home/hxwu/AMSSoft/amsroot534.csh
 
 if ($# < 2) then
     echo "Error: Need at least 2 parameters"
-    echo "Usage: $0 inputFile outputFile [fitOption=-2] [energyLossScale=2.0]"
+    echo "Usage: $0 inputFile outputFile [fitOption=-2] [energyLossScale=1.0]"
     exit 1
 endif
 
@@ -22,7 +22,7 @@ endif
 if ($# >= 4) then
     set energyLossScale = "$4"
 else
-    set energyLossScale = "2.0"
+    set energyLossScale = "1.0"
 endif
 
 ./build/bin/run/betaFitter $inputFile $outputFile $fitOption $energyLossScale

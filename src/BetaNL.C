@@ -19,87 +19,67 @@
 #include <TMath.h>
 
 BetaNLPars::BetaNLPars(
-    AMSPoint pos,
-    AMSDir dir,
-    double beta,
-    double mass,
-    int charge,
-    std::vector<double> zTOF,
-    std::vector<double> energyDeposited,
-    std::vector<double> hitTime,
-    std::vector<double> hitTimeError)
-    : BetaNLPars(pos, dir, beta, mass, charge)
+    const double beta,
+    const double mass,
+    const std::vector<double> energyDeposited,
+    const std::vector<double> hitTime,
+    const std::vector<double> hitTimeError,
+    const std::vector<double> pathLength)
+    : BetaNLPars(beta, mass)
 {
-    _zTOF = zTOF;
     _energyDeposited = energyDeposited;
     _hitTime = hitTime;
     _hitTimeError = hitTimeError;
 }
 
 BetaNLPars::BetaNLPars(
-    const AMSPoint pos,
-    const AMSDir dir,
     const double beta,
     const double mass,
-    const int charge,
-    const double zTOF[nTOF],
     const double energyDeposited[nTOF],
     const double hitTime[nTOF],
-    const double hitTimeError[nTOF])
-    : BetaNLPars(pos, dir, beta, mass, charge)
+    const double hitTimeError[nTOF],
+    const double pathLength[nTOF])
+    : BetaNLPars(beta, mass)
 {
-    _zTOF.assign(zTOF, zTOF + nTOF);
     _energyDeposited.assign(energyDeposited, energyDeposited + nTOF);
     _hitTime.assign(hitTime, hitTime + nTOF);
     _hitTimeError.assign(hitTimeError, hitTimeError + nTOF);
 }
 
 BetaNLPars::BetaNLPars(
-    const AMSPoint pos,
-    const AMSDir dir,
     const double beta,
     const double mass,
-    const int charge,
-    const float zTOF[nTOF],
     const float energyDeposited[nTOF],
     const float hitTime[nTOF],
     const float hitTimeError[nTOF],
     const float pathLength[nTOF])
-    : BetaNLPars(pos, dir, beta, mass, charge)
+    : BetaNLPars(beta, mass)
 {
-    _zTOF.assign(zTOF, zTOF + nTOF);
     _energyDeposited.assign(energyDeposited, energyDeposited + nTOF);
     _hitTime.assign(hitTime, hitTime + nTOF);
     _hitTimeError.assign(hitTimeError, hitTimeError + nTOF);
     _pathLength.assign(pathLength, pathLength + nTOF);
 }
 
-BetaNLPars::BetaNLPars(AMSPoint pos, AMSDir dir, double beta, double mass, int charge)
-    : _pos(pos), _dir(dir), _beta(beta), _mass(mass), _charge(charge)
-{
-    if (charge == 0)
-        std::cerr << "Info in <BetaNLPars::BetaNLPars>: Charge is zero!" << std::endl;
-}
-
 double BetaNL::BetaZ0()
 {
-    double beta = Beta();
+    const double beta = Beta();
     double energy = _pars->_mass / TMath::Sqrt(1 - beta * beta);
 
     energy -= (_pars->_energyDeposited[0] + _pars->_energyDeposited[1]) * _energyLossScale;
 
-    double momentum = TMath::Sqrt(energy * energy - _pars->_mass * _pars->_mass);
+    const double momentum = TMath::Sqrt(energy * energy - _pars->_mass * _pars->_mass);
     return momentum / energy;
 }
 
 double BetaNL::BetaS4()
 {
-    double beta = Beta();
+    const double beta = Beta();
     double energy = _pars->_mass / TMath::Sqrt(1 - beta * beta);
 
     energy -= (_pars->_energyDeposited[0] + _pars->_energyDeposited[1] + _pars->_energyDeposited[2]) * _energyLossScale;
 
-    double momentum = TMath::Sqrt(energy * energy - _pars->_mass * _pars->_mass);
+    const double momentum = TMath::Sqrt(energy * energy - _pars->_mass * _pars->_mass);
     return momentum / energy;
 }
 
@@ -113,32 +93,21 @@ double BetaNL::EnergyLossScale(double mcBeta)
         2);
     minimizer->SetFunction(functor);
 
-    double scaleRange = 10;
-    double initialScale = 2;
-    double lowerScale = initialScale - scaleRange;
-    double upperScale = initialScale + scaleRange;
+    const double scaleRange = 10;
+    const double initialScale = 2;
+    const double lowerScale = initialScale - scaleRange;
+    const double upperScale = initialScale + scaleRange;
     minimizer->SetLimitedVariable(0, "scale", initialScale, 0.1 * scaleRange, lowerScale, upperScale);
 
-    double timeError = _pars->_hitTimeError[0];
-    double initialTimeOffset = _pars->_hitTime[0];
-    double lowerTimeOffset = initialTimeOffset - 5 * timeError;
-    double upperTimeOffset = initialTimeOffset + 5 * timeError;
+    const double timeError = _pars->_hitTimeError[0];
+    const double initialTimeOffset = _pars->_hitTime[0];
+    const double lowerTimeOffset = initialTimeOffset - 5 * timeError;
+    const double upperTimeOffset = initialTimeOffset + 5 * timeError;
     minimizer->SetLimitedVariable(1, "timeOffset", initialTimeOffset, 0.1 * timeError, lowerTimeOffset, upperTimeOffset);
 
     minimizer->Minimize();
 
     return _energyLossScale = minimizer->X()[0];
-}
-
-/**
- * @brief Get a TrProp object with the particle parameters
- */
-TrProp BetaNL::Propagator() const
-{
-    TrProp propagator = TrProp(_pars->Pos(), _pars->Dir());
-    propagator.SetMassChrg(_pars->Mass(), _pars->Charge());
-
-    return propagator;
 }
 
 /**
@@ -157,47 +126,46 @@ TrProp BetaNL::Propagator() const
  * preserving the physical interpretation of stationary particles in the
  * tracking algorithm.
  */
-std::vector<double> BetaNL::propagate(const double beta) const
+std::vector<double> BetaNL::propagate(double beta) const
 {
+    constexpr double inv_c = 1.0 / BetaNLPars::SPEED_OF_LIGHT;
     std::vector<double> hitTimes(BetaNLPars::nTOF, 0.0);
-    TrProp propagator = Propagator();
 
-    double mass = _pars->Mass();
-    double mass2 = mass * mass;
+    const auto &paths = _pars->_pathLength;
+
+    if (beta >= 1 - 1e-10)
+    {
+        for (size_t i = 1; i < BetaNLPars::nTOF; ++i)
+            hitTimes[i] = hitTimes[i - 1] + paths[i] * inv_c / beta;
+        return hitTimes;
+    }
+
+    const double mass = _pars->_mass;
+    const double massSquared = _pars->_massSquared;
     double energy = mass / TMath::Sqrt(1 - beta * beta);
-    double invCharge = _pars->_charge == 0 ? 0 : 1.0 / _pars->_charge;
-    const double *const energyDeposited = _pars->_energyDeposited.data();
-    const double *const zTOF = _pars->_zTOF.data();
+
+    const auto &deps = _pars->_energyDeposited;
 
     for (size_t i = 1; i < BetaNLPars::nTOF; ++i)
     {
         // Update after passing last TOF layer
         // ------------------------------------------
+
         // Update particle energy
-        energy -= energyDeposited[i - 1] * _energyLossScale;
+        energy -= deps[i - 1] * _energyLossScale;
         if (energy <= mass) // Particle stopped
             break;
 
-        // Update particle rigidity
-        double momentum = TMath::Sqrt(energy * energy - mass2);
-        double rigidity = momentum * invCharge;
-        if (std::isnan(rigidity) || std::isinf(rigidity))
-            rigidity = 0;
-        propagator.SetRigidity(rigidity);
-
         // Propagate to this TOF layer
         // ------------------------------------------
-        // Calculate path length
-        // TODO: In TrProp::Propagate -> TrProp::Interpolate -> TrProp::VCFitPar,
-        // change `if (fabs(h) > steps && imat++ == 0) { ... }` to `if (fabs(h) > steps && imat++ == 0 && m55) { ... }`
-        // may improve the performance and do NOT change the result.
-        // double length = propagator.Propagate(zTOF[i]);
-        double length = _pars->_pathLength[i];
+
+        const double length = paths[i];
         if (length < 0)
             break;
 
         // Calculate hit time
-        hitTimes[i] = hitTimes[i - 1] + length / (BetaNLPars::SPEED_OF_LIGHT * (beta >= 1 ? beta : momentum / energy));
+        const double inv_beta = 1.0 / std::sqrt(1.0 - massSquared / (energy * energy));
+        hitTimes[i] = hitTimes[i - 1] + length * inv_c * inv_beta;
     }
 
     return hitTimes;
@@ -212,17 +180,17 @@ double BetaNL::betaChi2(const double *params)
     const double invBeta = params[0];
     _timeOffset = params[1];
 
-    const double *const hitTimeReconstructed = propagate(1 / invBeta).data();
-    const double *const hitTimeMeasured = _pars->_hitTime.data();
-    const double *const hitTimeError = _pars->_hitTimeError.data();
+    const auto &hitTimeReconstructed = propagate(1 / invBeta).data();
+    const auto &hitTimeMeasured = _pars->_hitTime.data();
+    const auto &hitTimeError = _pars->_hitTimeError.data();
 
     double chi2 = 0;
     for (size_t i = 0; i < BetaNLPars::nTOF; ++i)
     {
         if (hitTimeMeasured[i] == -1) // Skip missing hit times
             continue;
-        double dt = hitTimeReconstructed[i] - (hitTimeMeasured[i] - _timeOffset);
-        double sigma = hitTimeError[i];
+        const double dt = hitTimeReconstructed[i] - (hitTimeMeasured[i] - _timeOffset);
+        const double sigma = hitTimeError[i];
         chi2 += (dt * dt) / (sigma * sigma);
     }
 
@@ -239,17 +207,17 @@ double BetaNL::scaleChi2(const double *params, const double mcBeta)
     _energyLossScale = params[0];
     _timeOffset = params[1];
 
-    const double *const hitTimeReconstructed = propagate(mcBeta).data();
-    const double *const hitTimeMeasured = _pars->_hitTime.data();
-    const double *const hitTimeError = _pars->_hitTimeError.data();
+    const auto &hitTimeReconstructed = propagate(mcBeta).data();
+    const auto &hitTimeMeasured = _pars->_hitTime.data();
+    const auto &hitTimeError = _pars->_hitTimeError.data();
 
     double chi2 = 0;
     for (size_t i = 0; i < BetaNLPars::nTOF; ++i)
     {
         if (hitTimeMeasured[i] == -1)
             continue;
-        double dt = hitTimeReconstructed[i] - (hitTimeMeasured[i] - _timeOffset);
-        double sigma = hitTimeError[i];
+        const double dt = hitTimeReconstructed[i] - (hitTimeMeasured[i] - _timeOffset);
+        const double sigma = hitTimeError[i];
         chi2 += (dt * dt) / (sigma * sigma);
     }
 
@@ -287,15 +255,15 @@ double BetaNL::reconstruct()
     ROOT::Math::Functor functor(this, &BetaNL::betaChi2, 2);
     minimizer->SetFunction(functor);
 
-    double lowerInvBeta = 0.6; // beta < 1.67
-    double upperInvBeta = 3;   // beta > 0.33
-    double initialInvBeta = TMath::Range(lowerInvBeta, upperInvBeta, 1 / _pars->_beta);
+    const double lowerInvBeta = 0.6; // beta < 1.67
+    const double upperInvBeta = 3;   // beta > 0.33
+    const double initialInvBeta = TMath::Range(lowerInvBeta, upperInvBeta, 1 / _pars->_beta);
     minimizer->SetLimitedVariable(0, "invBeta", initialInvBeta, 1e-5, lowerInvBeta, upperInvBeta);
 
-    double timeError = _pars->_hitTimeError[0];
-    double initialTimeOffset = _pars->_hitTime[0];
-    double lowerTimeOffset = initialTimeOffset - 5 * timeError;
-    double upperTimeOffset = initialTimeOffset + 5 * timeError;
+    const double timeError = _pars->_hitTimeError[0];
+    const double initialTimeOffset = _pars->_hitTime[0];
+    const double lowerTimeOffset = initialTimeOffset - 5 * timeError;
+    const double upperTimeOffset = initialTimeOffset + 5 * timeError;
     minimizer->SetLimitedVariable(1, "timeOffset", initialTimeOffset, 0.1 * timeError, lowerTimeOffset, upperTimeOffset);
 
     minimizer->Minimize();

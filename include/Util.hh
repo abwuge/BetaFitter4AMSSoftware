@@ -69,6 +69,16 @@ namespace Util
      * @return bool True if calculation succeeds, false otherwise
      */
     bool saveEnergyLossScale(const std::string &inputFile, const std::string &outputFile);
+
+    /**
+     * @brief Benchmark BetaNL::Beta() function average CPU time
+     * 
+     * @param inputFile Path to the ROOT file containing particle data
+     * @param outputFile Path to save the benchmark results
+     * @param energyLossScale Energy loss scale factor
+     * @return bool True if benchmark succeeds, false otherwise
+     */
+    bool benchmarkBetaNL(const std::string &inputFile, const std::string &outputFile, double energyLossScale = 2);
 }
 
 #endif // __UTIL_HH__

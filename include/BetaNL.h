@@ -48,69 +48,50 @@ public:
 
     /**
      * Constructor with parameters
-     * @param pos Initial position in cm of the particle
-     * @param dir Initial direction of the particle
      * @param beta Initial beta of the particle
      * @param mass Mass in GeV/c^2 of the particle
-     * @param charge Charge in e of the particle (might be 0!)
-     * @param zTOF Z positions in cm of TOF hits
      * @param energyDeposited Energy deposited in GeV at TOF hits
      * @param hitTime Hit times in ns at TOF hits
      * @param hitTimeError Hit time errors in ns at TOF hits
+     * @param pathLength Path length in cm at TOF hits
      */
     BetaNLPars(
-        AMSPoint pos,
-        AMSDir dir,
-        double beta,
-        double mass,
-        int charge,
-        std::vector<double> zTOF,
-        std::vector<double> energyDeposited,
-        std::vector<double> hitTime,
-        std::vector<double> hitTimeError);
+        const double beta,
+        const double mass,
+        const std::vector<double> energyDeposited,
+        const std::vector<double> hitTime,
+        const std::vector<double> hitTimeError,
+        const std::vector<double> pathLength);
 
     /**
      * Constructor with parameters
-     * @param pos Initial position in cm of the particle
-     * @param dir Initial direction of the particle
      * @param beta Initial beta of the particle
      * @param mass Mass in GeV/c^2 of the particle
-     * @param charge Charge in e of the particle (might be 0!)
-     * @param zTOF Z positions in cm of TOF hits
      * @param energyDeposited Energy deposited in GeV at TOF hits
      * @param hitTime Hit times in ns at TOF hits
      * @param hitTimeError Hit time errors in ns at TOF hits
+     * @param pathLength Path length in cm at TOF hits
      */
     BetaNLPars(
-        const AMSPoint pos,
-        const AMSDir dir,
         const double beta,
         const double mass,
-        const int charge,
-        const double zTOF[nTOF],
         const double energyDeposited[nTOF],
         const double hitTime[nTOF],
-        const double hitTimeError[nTOF]);
+        const double hitTimeError[nTOF],
+        const double pathLength[nTOF]);
 
     /**
      * Constructor with parameters
-     * @param pos Initial position in cm of the particle
-     * @param dir Initial direction of the particle
      * @param beta Initial beta of the particle
      * @param mass Mass in GeV/c^2 of the particle
-     * @param charge Charge in e of the particle (might be 0!)
-     * @param zTOF Z positions in cm of TOF hits
      * @param energyDeposited Energy deposited in GeV at TOF hits
      * @param hitTime Hit times in ns at TOF hits
      * @param hitTimeError Hit time errors in ns at TOF hits
+     * @param pathLength Path length in cm at TOF hits
      */
     BetaNLPars(
-        const AMSPoint pos,
-        const AMSDir dir,
         const double beta,
         const double mass,
-        const int charge,
-        const float zTOF[nTOF],
         const float energyDeposited[nTOF],
         const float hitTime[nTOF],
         const float hitTimeError[nTOF],
@@ -136,26 +117,6 @@ public:
      */
     double Mass() const { return _mass; }
 
-    /**
-     * Get the charge in e of the particle
-     * @note Charge always >= 0
-     * @note Refer to BetaNL::Momentum() for sign
-     * @return Charge
-     */
-    int Charge() const { return _charge; }
-
-    /**
-     * Get the position in cm of the particle
-     * @return Position
-     */
-    AMSPoint Pos() const { return _pos; }
-
-    /**
-     * Get the direction of the particle
-     * @return Direction
-     */
-    AMSDir Dir() const { return _dir; }
-
     // Setters
     // ---------------------------------------------------------------------------
 
@@ -173,28 +134,19 @@ public:
      */
     double Momentum() const { return _mass * _beta / sqrt(1 - _beta * _beta); }
 
-    /**
-     * Get the rigidity in GeV/c of the particle
-     * @note > 0 for positive charge, < 0 for negative charge
-     * @return Rigidity (GeV/c)
-     */
-    double Rigidity() const { return Momentum() / _charge; }
-
 private:
-    BetaNLPars(AMSPoint pos, AMSDir dir, double beta, double mass, int charge);
+    BetaNLPars(double beta, double mass)
+        : _beta(beta), _mass(mass) {};
 
 private:
     // Particle Information
     // ---------------------------------------------------------------------------
-    AMSPoint _pos = AMSPoint(0, 0, 0); // Position in cm of the particle
-    AMSDir _dir = AMSDir(0, 0, 1);     // Direction of the particle
-    double _beta = 0.8;                // Beta of the particle
-    double _mass = 0.938;              // Mass in GeV/c^2 of the particle
-    int _charge = 1;                   // Charge in e of the particle (might be 0!)
+    const double _beta = 0.8;                  // Beta of the particle
+    const double _mass = 0.938;                // Mass in GeV/c^2 of the particle
+    const double _massSquared = _mass * _mass; // Mass squared in GeV^2/c^4 of the particle
 
     // Hit Information
     // ---------------------------------------------------------------------------
-    std::vector<double> _zTOF;            // Z positions in cm of TOF hits
     std::vector<double> _energyDeposited; // Energy deposited in GeV at TOF hits
     std::vector<double> _hitTime;         // Hit times in ns at TOF hits
     std::vector<double> _hitTimeError;    // Hit time errors in ns at TOF hits
@@ -282,8 +234,7 @@ public:
     double EnergyLossScale(double mcBeta);
 
 private:
-    TrProp Propagator() const;                                   // Get the particle propagator with BetaNLPars
-    std::vector<double> propagate(const double beta) const;      // Propagate the particle with given beta
+    std::vector<double> propagate(double beta) const;            // Propagate the particle with given beta
     double betaChi2(const double *params);                       // Calculate chi-square for beta reconstruction
     double scaleChi2(const double *params, const double mcBeta); // Calculate chi-square for energy loss scale
     double reconstruct();                                        // Reconstruct the 1/beta value

@@ -374,6 +374,7 @@ void plotEnergyLoss(std::string fileName = "test.root",
     canvas->SetRightMargin(0.11);
     canvas->SetGridx();
     canvas->SetGridy();
+    canvas->SetLogy();
 
     hEnergyLossScaleS1S2->Draw();
     canvas->Print(outputName);

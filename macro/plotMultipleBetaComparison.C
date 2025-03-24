@@ -17,6 +17,7 @@
 #include <string>
 #include <array>
 #include <algorithm>
+#include <map>
 
 const int nBinsX = 40;
 const int nBinsY = 100;
@@ -37,11 +38,11 @@ double xMax = 0;
 double binWidth = 0;
 
 /**
- * Get Z value and energyLossScale for a file from README.md
+ * Get Z value or energyLossScale for a file from README.md
  * @param fileName Name of the ROOT file
- * @return pair of Z value and energyLossScale. Returns {-1, -1} if not found
+ * @return Z value or energyLossScale. Returns -1 if not found
  */
-double getParamFromReadme(const std::string &fileName)
+double getParamFromReadme(const std::string &fileName, bool getZ = false)
 {
     std::ifstream readme("results/README.md");
     if (!readme)
@@ -54,9 +55,9 @@ double getParamFromReadme(const std::string &fileName)
     std::string targetFile = fileName;
     // If fileName starts with "results/", remove it
     if (targetFile.substr(0, 8) == "results/")
-    {
         targetFile = targetFile.substr(8);
-    }
+    else if (targetFile.size() < 5 || targetFile.substr(targetFile.size() - 5) != ".root")
+        targetFile += ".root";
     else
     {
         std::cerr << "Warning: File name does not start with 'results/'"
@@ -64,7 +65,7 @@ double getParamFromReadme(const std::string &fileName)
         return -1;
     }
 
-    double energyLossScale = -1.0;
+    double parameter = -1.0;
 
     // Read file from bottom to top to get the latest entry
     std::vector<std::string> lines;
@@ -77,32 +78,58 @@ double getParamFromReadme(const std::string &fileName)
         size_t filePos = it->find("FILE = " + targetFile);
         if (filePos != std::string::npos)
         {
-            // Get energyLossScale value
-            size_t scalePos = it->find("energyLossScale = ", filePos);
-            if (scalePos != std::string::npos)
+            // Get parameter
+            if (getZ)
             {
-                scalePos += 17; // Skip "energyLossScale = "
-                size_t commaPos = it->find(",", scalePos);
-                if (commaPos != std::string::npos)
+                // Get Z value
+                size_t zPos = it->find("Z = ", filePos);
+                if (zPos != std::string::npos)
                 {
-                    std::string scaleStr = it->substr(scalePos, commaPos - scalePos);
-                    try
+                    zPos += 4; // Skip "Z = "
+                    size_t commaPos = it->find(",", zPos);
+                    if (commaPos != std::string::npos)
                     {
-                        energyLossScale = std::stod(scaleStr);
+                        std::string zStr = it->substr(zPos, commaPos - zPos);
+                        try
+                        {
+                            parameter = std::stoi(zStr);
+                        }
+                        catch (...)
+                        {
+                            continue;
+                        }
                     }
-                    catch (...)
+                }
+            }
+            else
+            {
+                // Get energyLossScale value
+                size_t scalePos = it->find("energyLossScale = ", filePos);
+                if (scalePos != std::string::npos)
+                {
+                    scalePos += 17; // Skip "energyLossScale = "
+                    size_t commaPos = it->find(",", scalePos);
+                    if (commaPos != std::string::npos)
                     {
-                        continue;
+                        std::string scaleStr = it->substr(scalePos, commaPos - scalePos);
+                        try
+                        {
+                            parameter = std::stod(scaleStr);
+                        }
+                        catch (...)
+                        {
+                            continue;
+                        }
                     }
                 }
             }
 
-            if (energyLossScale > 0)
+            if (parameter > 0)
                 break;
         }
     }
 
-    return energyLossScale;
+    return parameter;
 }
 
 /**
@@ -116,7 +143,7 @@ struct Data
     TGraph *graphErrors{nullptr};
 };
 
-Data getData(std::string fileName, const std::string branch = "nonlinearBeta", const char *const legend = nullptr)
+Data getData(std::string fileName, const std::string branch = "nonlinearBeta", const char *const legend = nullptr, const char *outputName = nullptr)
 {
     Data data;
 
@@ -178,7 +205,7 @@ Data getData(std::string fileName, const std::string branch = "nonlinearBeta", c
 
     data.hist = new TH2D(Form("hResVsMC_%d", histogramCounter),
                          "Reconstruction Residuals",
-                         nBinsX, xMin, xMax, nBinsY, yMin, yMax);
+                         nBinsX, xMin, xMax, nBinsY * 5, -0.4, 1.4);
 
     tree->Draw(
         Form("1/%s - 1/mcBeta:mcBeta>>hResVsMC_%d",
@@ -188,7 +215,23 @@ Data getData(std::string fileName, const std::string branch = "nonlinearBeta", c
 
     // Fit
     // ------------------------------------------------------------------------
-    
+
+    TCanvas *canvas;
+    TPaveText *fitInfoText;
+    if (outputName)
+    {
+        canvas = new TCanvas(Form("canvas_%d", histogramCounter), "", 3508, 2480); // A4 landscape
+        canvas->SetLeftMargin(0.16);
+        canvas->SetRightMargin(0.12);
+        canvas->SetGridx();
+        canvas->SetGridy();
+        canvas->SetLogy();
+
+        fitInfoText = new TPaveText(0.3, 0.92, 0.7, 0.98, "NDC");
+        fitInfoText->SetFillColor(0);
+        fitInfoText->SetBorderSize(0);
+    }
+
     // Arrays to store fit results
     std::vector<double> mcBetaValues;
     std::vector<double> means, errors;
@@ -204,14 +247,34 @@ Data getData(std::string fileName, const std::string branch = "nonlinearBeta", c
             Form("proj_%d_%d", histogramCounter, i),
             i + 1,
             i + 1);
-        if (proj->GetEntries() > 50)
+        if (proj->GetEntries() > 300)
         {
-            TFitResultPtr fitResult = proj->Fit("gaus", "SQNR");
+            TFitResultPtr fitResult = proj->Fit("gaus", "SQR");
             if (fitResult->Status() == 0)
             {
+                if (fitResult->ParError(2) > fitResult->Parameter(2))
+                    continue;
+
                 mcBetaValues.push_back(binCenter);
                 means.push_back(fitResult->Parameter(1));
                 errors.push_back(fitResult->Parameter(2));
+
+                if (outputName)
+                {
+                    proj->Draw();
+
+                    fitInfoText->Clear();
+                    fitInfoText->AddText(
+                        Form("%s Entries (%d) #beta: %.3f #mu: %.3f #sigma: %.3f",
+                             data.legend,
+                             (int)proj->GetEntries(),
+                             binCenter,
+                             fitResult->Parameter(1),
+                             fitResult->Parameter(2)));
+                    fitInfoText->Draw();
+
+                    canvas->Print(outputName);
+                }
             }
         }
     }
@@ -247,7 +310,7 @@ Data getData(std::string fileName, const std::string branch = "nonlinearBeta", c
  * @param outputName Output file name (default: "test_multiple_beta_comparison.pdf")
  */
 void plotMultipleBetaComparison(const std::vector<std::string> &fileNames,
-                                const char *outputName = "test_multiple_beta_comparison.pdf")
+                                const char *outputName = nullptr)
 {
     if (fileNames.empty())
     {
@@ -261,15 +324,40 @@ void plotMultipleBetaComparison(const std::vector<std::string> &fileNames,
     gStyle->SetFrameLineWidth(2);
     gStyle->SetEndErrorSize(20);
 
+    // Generate output name
+    // ------------------------------------------------------------------------
+
+    // Get Z value and energyLossScale from the file
+    double Z = getParamFromReadme(fileNames[0], true);
+    std::string actualOutputName;
+
+    // Set output name
+    if (!outputName)
+    {
+        if (Z > 0)
+            actualOutputName = Form("test_multiple_beta_Z%.0f.pdf", Z);
+        else
+            actualOutputName = "test_multiple_beta_comparison.pdf";
+        outputName = actualOutputName.c_str();
+    }
+
+    // Create canvas
+    TCanvas *canvas = new TCanvas("canvas", "", 3508, 2480); // A4 landscape
+    canvas->SetLeftMargin(0.16);
+    canvas->SetRightMargin(0.12);
+    canvas->SetGridx();
+    canvas->SetGridy();
+    canvas->Print(Form("%s[", outputName));
+
     // Open files and prepare data
     // ------------------------------------------------------------------------
 
     std::vector<Data> dataVector;
     dataVector.reserve(fileNames.size() + 1);
 
-    dataVector.push_back(getData(fileNames[0], "linearBeta", "Linear"));
+    dataVector.push_back(getData(fileNames[0], "linearBeta", "Linear", outputName));
     for (auto &fileName : fileNames)
-        dataVector.push_back(getData(fileName));
+        dataVector.push_back(getData(fileName, "nonlinearBeta", nullptr, outputName));
 
     if (dataVector.empty())
     {
@@ -277,15 +365,10 @@ void plotMultipleBetaComparison(const std::vector<std::string> &fileNames,
         return;
     }
 
-    // Create canvas and draw comparison
+    // Draw
     // ------------------------------------------------------------------------
 
-    TCanvas *canvas = new TCanvas("canvas", "", 3508, 2480); // A4 landscape
-    canvas->SetLeftMargin(0.16);
-    canvas->SetRightMargin(0.12);
-    canvas->SetGridx();
-    canvas->SetGridy();
-    canvas->Print(Form("%s[", outputName));
+    canvas->cd();
 
     // Create comparison plot
     TH2F *hComparison = new TH2F("hComparison",
@@ -325,29 +408,73 @@ void plotMultipleBetaComparison(const std::vector<std::string> &fileNames,
     canvas->Print(Form("%s]", outputName));
 
     std::cout << "Multiple beta comparison plot saved to: " << outputName << std::endl;
+
+    // Print data as a table
+    // ------------------------------------------------------------------------
+    std::cout << "\nData Table (tab-separated)\n" << std::endl;
+    
+    // Print header
+    std::cout << "beta";
+    for (auto &data : dataVector) {
+        std::cout << "\t" << data.legend << ":mean";
+        std::cout << "\t" << data.legend << ":error";
+    }
+    std::cout << std::endl;
+    
+    // Create combined map of all beta points
+    std::map<double, std::vector<std::pair<double, double>>> combinedData;
+    
+    // Collect all beta points from all graphs
+    for (size_t i = 0; i < dataVector.size(); ++i) {
+        for (int j = 0; j < dataVector[i].graph->GetN(); ++j) {
+            double x, y, ye;
+            dataVector[i].graph->GetPoint(j, x, y);
+            dataVector[i].graphErrors->GetPoint(j, x, ye);
+            
+            // Store mean and error for this beta point
+            if (combinedData.find(x) == combinedData.end()) {
+                combinedData[x] = std::vector<std::pair<double, double>>(dataVector.size(), std::make_pair(-1, -1));
+            }
+            combinedData[x][i] = std::make_pair(y, ye);
+        }
+    }
+    
+    // Print the table rows
+    for (const auto &item : combinedData) {
+        double beta = item.first;
+        const auto &values = item.second;
+        
+        std::cout << beta;
+        for (const auto &value : values) {
+            // Print mean
+            if (value.first != -1) {
+                std::cout << "\t" << value.first;
+            } else {
+                std::cout << "\t-";
+            }
+            
+            // Print error
+            if (value.second != -1) {
+                std::cout << "\t" << value.second;
+            } else {
+                std::cout << "\t-";
+            }
+        }
+        std::cout << std::endl;
+    }
 }
 
 /**
  * Convenience wrapper that accepts exactly two filenames
  */
 void plotMultipleBetaComparison(const char *fileName1, const char *fileName2,
-                                const char *outputName = "test_multiple_beta_comparison.pdf")
+                                const char *outputName = nullptr)
 {
     std::vector<std::string> fileNames = {fileName1, fileName2};
     plotMultipleBetaComparison(fileNames, outputName);
 }
 
-/**
- * Convenience wrapper that accepts exactly three filenames
- */
-void plotMultipleBetaComparison(const char *fileName1, const char *fileName2, const char *fileName3,
-                                const char *outputName = "test_multiple_beta_comparison.pdf")
-{
-    std::vector<std::string> fileNames = {fileName1, fileName2, fileName3};
-    plotMultipleBetaComparison(fileNames, outputName);
-}
-
-void plotMultipleBetaComparison(std::initializer_list<const char *> fileNames, const char *outputName = "test_multiple_beta_comparison.pdf")
+void plotMultipleBetaComparison(std::initializer_list<const char *> fileNames, const char *outputName = nullptr)
 {
     std::vector<std::string> fileNamesString;
     for (const char *fileName : fileNames)
