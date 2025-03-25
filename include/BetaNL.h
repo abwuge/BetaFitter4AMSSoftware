@@ -28,7 +28,7 @@
 class BetaNLPars
 {
 public:
-    static constexpr size_t nTOF = 4;                    // Number of TOF hits
+    static constexpr int nTOF = 4;                       // Number of TOF hits
     static constexpr double SPEED_OF_LIGHT = 29.9792458; // Speed of light in cm/ns
 
 public:

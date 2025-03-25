@@ -146,15 +146,15 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     }
 
     // Extract values for readability
-    double energyLossScaleMin = -10;
-    double energyLossScaleMax = 12;
+    double energyLossScaleMin = -6;
+    double energyLossScaleMax = 10;
     double mcBetaMin = tree->GetMinimum("mcBeta");
     double mcBetaMax = tree->GetMaximum("mcBeta");
 
     // Number of bins for histograms
-    int nBins = 1000;
+    int nBins = 100;
     int nBinsX = 40;   // Number of bins in beta direction
-    int nBinsY = 1000; // Number of bins in scale direction
+    int nBinsY = 100; // Number of bins in scale direction
 
     // Create 1D histogram
     TH1F *hEnergyLossScale = new TH1F("hEnergyLossScale",

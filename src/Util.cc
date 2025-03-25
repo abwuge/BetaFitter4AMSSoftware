@@ -89,7 +89,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     {
         tree->GetEntry(i);
 
-        if (mevmom1[10] == -1000)
+        if (mevmom1[17] == -1000)
             continue;
 
         ParticleData data;
@@ -110,7 +110,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
             data.mcInitDir[1] = mevdir1[4][1];
             data.mcInitDir[2] = mevdir1[4][2];
 
-            float mmom = mevmom1[10];
+            float mmom = mevmom1[17];
             data.mcMomentum = mmom;
             data.mcBeta = mmom / sqrt(mmom * mmom + mmass * mmass);
         }

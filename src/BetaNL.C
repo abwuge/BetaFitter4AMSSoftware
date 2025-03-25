@@ -68,8 +68,10 @@ BetaNLPars::BetaNLPars(
 
 void BetaNLPars::initPathLength()
 {
-    _pathLength[0] -= _pathLength[1];
-    _pathLength[3] -= _pathLength[2];
+    for (int i = 0; i < 4; ++i)
+        _pathLength[i] = _pathLength[i] - _pathLength[i + 1];
+
+    _pathLength[3] = 0;
 }
 
 double BetaNL::EnergyLossScale(double mcBeta)
@@ -83,13 +85,13 @@ double BetaNL::EnergyLossScale(double mcBeta)
     minimizer->SetFunction(functor);
 
     const double scaleRange = 10;
-    const double initialScale = 1;
+    const double initialScale = 2;
     const double lowerScale = initialScale - scaleRange;
     const double upperScale = initialScale + scaleRange;
     minimizer->SetLimitedVariable(0, "scale", initialScale, 0.1 * scaleRange, lowerScale, upperScale);
 
     const double timeError = _pars->_hitTimeError[0];
-    const double initialTimeOffset = (_pars->_hitTime[0] + _pars->_hitTime[3]) / 2;
+    const double initialTimeOffset = _pars->_hitTime[3];
     const double lowerTimeOffset = initialTimeOffset - 5 * timeError;
     const double upperTimeOffset = initialTimeOffset + 5 * timeError;
     minimizer->SetLimitedVariable(1, "timeOffset", initialTimeOffset, 0.1 * timeError, lowerTimeOffset, upperTimeOffset);
@@ -124,32 +126,24 @@ std::vector<double> BetaNL::propagate(double beta) const
 
     if (beta >= 1 - 1e-10)
     {
-        hitTimes[1] = paths[1] * inv_c / beta;
-        hitTimes[2] = paths[2] * inv_c / beta;
-
-        hitTimes[0] = hitTimes[1] + paths[0] * inv_c / beta;
-        hitTimes[3] = hitTimes[2] + paths[3] * inv_c / beta;
+        for (int i = BetaNLPars::nTOF - 2; i >= 0; --i)
+            hitTimes[i] = hitTimes[i + 1] + paths[i] * inv_c / beta;
 
         return hitTimes;
     }
 
     const double mass = _pars->_mass;
     const double massSquared = _pars->_massSquared;
-    const double energy = mass / TMath::Sqrt(1 - beta * beta);
+    double energy = mass / TMath::Sqrt(1 - beta * beta);
 
     const auto &deps = _pars->_energyDeposited;
 
-    hitTimes[1] = paths[1] * inv_c / beta;
-    hitTimes[2] = paths[2] * inv_c / beta;
-
-    const double energy1 = energy + deps[1] * _energyLossScale;
-    const double energy2 = energy - deps[2] * _energyLossScale;
-
-    const double inv_beta1 = 1.0 / std::sqrt(1.0 - massSquared / (energy1 * energy1));
-    const double inv_beta2 = 1.0 / std::sqrt(1.0 - massSquared / (energy2 * energy2));
-
-    hitTimes[0] = hitTimes[1] + paths[0] * inv_c * inv_beta1;
-    hitTimes[3] = hitTimes[2] + paths[3] * inv_c * inv_beta2;
+    for (int i = BetaNLPars::nTOF - 2; i >= 0; --i)
+    {
+        energy += deps[i + 1] * _energyLossScale;
+        const double inv_beta = 1.0 / std::sqrt(1.0 - massSquared / (energy * energy));
+        hitTimes[i] = hitTimes[i + 1] + paths[i] * inv_c * inv_beta;
+    }
 
     return hitTimes;
 }
@@ -168,7 +162,7 @@ double BetaNL::betaChi2(const double *params)
     const auto &hitTimeError = _pars->_hitTimeError.data();
 
     double chi2 = 0;
-    for (size_t i = 0; i < BetaNLPars::nTOF; ++i)
+    for (int i = 0; i < BetaNLPars::nTOF; ++i)
     {
         if (hitTimeMeasured[i] == -1)
             continue;
@@ -190,12 +184,12 @@ double BetaNL::scaleChi2(const double *params, const double mcBeta)
     _energyLossScale = params[0];
     _timeOffset = params[1];
 
-    const auto &hitTimeReconstructed = propagate(mcBeta).data();
+    const auto &hitTimeReconstructed = propagate(mcBeta);
     const auto &hitTimeMeasured = _pars->_hitTime.data();
     const auto &hitTimeError = _pars->_hitTimeError.data();
 
     double chi2 = 0;
-    for (size_t i = 0; i < BetaNLPars::nTOF; ++i)
+    for (int i = 0; i < BetaNLPars::nTOF; ++i)
     {
         if (hitTimeMeasured[i] == -1)
             continue;
@@ -239,12 +233,12 @@ double BetaNL::reconstruct()
     minimizer->SetFunction(functor);
 
     const double lowerInvBeta = 0.6; // beta < 1.67
-    const double upperInvBeta = 10;   // beta > 0.1
+    const double upperInvBeta = 10;  // beta > 0.1
     const double initialInvBeta = TMath::Range(lowerInvBeta, upperInvBeta, 1 / _pars->_beta);
     minimizer->SetLimitedVariable(0, "invBeta", initialInvBeta, 1e-5, lowerInvBeta, upperInvBeta);
 
     const double timeError = _pars->_hitTimeError[0];
-    const double initialTimeOffset = (_pars->_hitTime[0] + _pars->_hitTime[3]) / 2;
+    const double initialTimeOffset = _pars->_hitTime[3];
     const double lowerTimeOffset = initialTimeOffset - 5 * timeError;
     const double upperTimeOffset = initialTimeOffset + 5 * timeError;
     minimizer->SetLimitedVariable(1, "timeOffset", initialTimeOffset, 0.1 * timeError, lowerTimeOffset, upperTimeOffset);
