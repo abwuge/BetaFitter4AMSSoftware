@@ -48,7 +48,7 @@ int getParamsFromReadme(const std::string &fileName)
     while (std::getline(readme, line))
         lines.push_back(line);
 
-        // Search from the end to find the latest matching entry
+    // Search from the end to find the latest matching entry
     for (auto it = lines.rbegin(); it != lines.rend(); ++it)
     {
         size_t filePos = it->find("FILE = " + targetFile);
@@ -146,15 +146,15 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     }
 
     // Extract values for readability
-    double energyLossScaleMin = -2;
-    double energyLossScaleMax = 6;
+    double energyLossScaleMin = -10;
+    double energyLossScaleMax = 12;
     double mcBetaMin = tree->GetMinimum("mcBeta");
     double mcBetaMax = tree->GetMaximum("mcBeta");
 
     // Number of bins for histograms
-    int nBins = 200;
-    int nBinsX = 40;  // Number of bins in beta direction
-    int nBinsY = 100; // Number of bins in scale direction
+    int nBins = 1000;
+    int nBinsX = 40;   // Number of bins in beta direction
+    int nBinsY = 1000; // Number of bins in scale direction
 
     // Create 1D histogram
     TH1F *hEnergyLossScale = new TH1F("hEnergyLossScale",
@@ -198,8 +198,9 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     canvas1->SetRightMargin(0.11);
     canvas1->SetGridx();
     canvas1->SetGridy();
+    canvas1->SetLogy();
 
-    tree->Draw("energyLossScale>>hEnergyLossScale", "mcBeta < 0.9");
+    tree->Draw("energyLossScale>>hEnergyLossScale", "mcBeta < 0.95");
     hEnergyLossScale->SetLineColor(kBlue);
     hEnergyLossScale->SetLineWidth(2);
     hEnergyLossScale->SetFillColor(kBlue - 10);
@@ -237,60 +238,37 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     tree->Draw("energyLossScale:mcBeta>>hScaleVsBeta");
     hScaleVsBeta->Draw("COLZ");
 
-    // Prepare for profile analysis
-    const int nProfiles = nBinsX;
-    double betaValues[nProfiles];
-    double scaleMean[nProfiles], scaleError[nProfiles];
+    std::vector<double> betaValues, scaleMean, scaleError;
+    betaValues.reserve(nBinsX);
+    scaleMean.reserve(nBinsX);
+    scaleError.reserve(nBinsX);
     double binWidth = (mcBetaMax - mcBetaMin) / nBinsX;
 
-    // Print table header before the loop
-    std::cout << "\nBin\tBeta\tEntries\tMean\n"
-              << std::string(65, '-') << std::endl;
-
     // Process each bin
-    for (int bin = 0; bin < nBinsX; ++bin)
+    TF1 *fGaus = new TF1("fGaus", "gaus", energyLossScaleMin, energyLossScaleMax);
+    fGaus->SetParLimits(1, energyLossScaleMin, energyLossScaleMax);
+    for (int i = 0; i < nBinsX; ++i)
     {
-        double binCenter = mcBetaMin + (bin + 0.5) * binWidth;
-        int binIdx = bin + 1; // ROOT histograms are 1-indexed
-
-        // Calculate bin range for projection
-        int binWindow = 1; // Use ±1 bins for better statistics
-        int binLow = TMath::Max(1, binIdx - binWindow);
-        int binHigh = TMath::Min(nBinsX, binIdx + binWindow);
-
-        betaValues[bin] = binCenter;
+        double binCenter = mcBetaMin + (i + 0.5) * binWidth;
 
         // Get projection and fit
-        TH1D *proj = hScaleVsBeta->ProjectionY(Form("proj_%d", bin), binLow, binHigh, "e");
-        if (proj->GetEntries() > 0)
+        TH1D *proj = hScaleVsBeta->ProjectionY(Form("proj_%d", i), i + 1, i + 1);
+        if (proj->GetEntries() > 50)
         {
-            proj->Fit("gaus", "QN", "", energyLossScaleMin, energyLossScaleMax);
-            TF1 *fit = proj->GetFunction("gaus");
-            if (fit && fit->GetProb() > 0.01)
+            TFitResultPtr fitResult = proj->Fit(fGaus, "SQNR");
+            if (fitResult->Status() == 0)
             {
-                scaleMean[bin] = fit->GetParameter(1);
-                scaleError[bin] = fit->GetParameter(2);
+                betaValues.push_back(binCenter);
+                scaleMean.push_back(fitResult->Parameter(1));
+                scaleError.push_back(fitResult->Parameter(2));
             }
-            else
-            {
-                scaleMean[bin] = proj->GetMean();
-                scaleError[bin] = proj->GetRMS();
-            }
-        }
-        else
-        {
-            scaleMean[bin] = 0;
-            scaleError[bin] = 0;
-        }
 
-        printf("%d\t%.5f\t%d\t%.5f\n",
-               bin, binCenter, (Int_t)proj->GetEntries(), scaleMean[bin]);
-
-        delete proj;
+            delete proj;
+        }
     }
 
     // Create and draw TGraphErrors
-    TGraphErrors *grScale = new TGraphErrors(nProfiles, betaValues, scaleMean, 0, scaleError);
+    TGraphErrors *grScale = new TGraphErrors(betaValues.size(), betaValues.data(), scaleMean.data(), 0, scaleError.data());
     grScale->SetMarkerStyle(20);
     grScale->SetMarkerColor(kBlack);
     grScale->SetMarkerSize(1.5);

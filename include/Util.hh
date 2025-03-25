@@ -79,6 +79,8 @@ namespace Util
      * @return bool True if benchmark succeeds, false otherwise
      */
     bool benchmarkBetaNL(const std::string &inputFile, const std::string &outputFile, double energyLossScale = 2);
+
+    void test();
 }
 
 #endif // __UTIL_HH__

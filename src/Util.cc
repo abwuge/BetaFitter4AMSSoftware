@@ -89,7 +89,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     {
         tree->GetEntry(i);
 
-        if (mevmom1[4] == -1000)
+        if (mevmom1[10] == -1000)
             continue;
 
         ParticleData data;
@@ -110,7 +110,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
             data.mcInitDir[1] = mevdir1[4][1];
             data.mcInitDir[2] = mevdir1[4][2];
 
-            float mmom = mevmom1[4];
+            float mmom = mevmom1[10];
             data.mcMomentum = mmom;
             data.mcBeta = mmom / sqrt(mmom * mmom + mmass * mmass);
         }
@@ -131,10 +131,8 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
             // TODO: SO FAR it's constant, but it might not be correct
             data.TOF_hitTimeError[j] = 0.1544809;
             data.TOF_hitEdep[j] = tof_edep[j] * 1e-3;
+            data.TOF_length[j] = tof_leng[j];
         }
-
-        for (int j = 1; j < ParticleData::TOF_MAX_HITS; ++j)
-            data.TOF_length[j] = tof_leng[j] - tof_leng[j - 1];
 
         for (int j = 0; j < ParticleData::TRACKER_MAX_HITS; ++j)
         {
@@ -352,6 +350,8 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
     float energyDepositedS1S2 = 0.0;  // energy deposited from before S1 to after S2
     float energyDepositedTotal = 0.0; // total energy deposited
     float energyLoss_S1S2_ = 0.0;     // energy loss from before S1 to after S2
+    float energyLoss_S1L3 = 0.0;     // energy loss from before S1 to L3
+    float energyLoss_S1L4 = 0.0;     // energy loss from before S1 to L4
     float energyLoss_S1S4_ = 0.0;     // energy loss from before S1 to after S4
     float energyLossScaleS1S2 = 0.0;  // energy loss scale factor from before S1 to after S2
     float energyLossScaleTotal = 0.0; // energy loss scale factor from before S1 to after S4
@@ -364,6 +364,8 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
     treeOut->Branch("energyDepositedS1S2", &energyDepositedS1S2, "energyDepositedS1S2/F");
     treeOut->Branch("energyDepositedTotal", &energyDepositedTotal, "energyDepositedTotal/F");
     treeOut->Branch("energyLoss_S1S2_", &energyLoss_S1S2_, "energyLoss_S1S2_/F");
+    treeOut->Branch("energyLoss_S1L3", &energyLoss_S1L3, "energyLoss_S1L3/F");
+    treeOut->Branch("energyLoss_S1L4", &energyLoss_S1L4, "energyLoss_S1L4/F");
     treeOut->Branch("energyLoss_S1S4_", &energyLoss_S1S4_, "energyLoss_S1S4_/F");
     treeOut->Branch("energyLossScaleS1S2", &energyLossScaleS1S2, "energyLossScaleS1S2/F");
     treeOut->Branch("energyLossScaleTotal", &energyLossScaleTotal, "energyLossScaleTotal/F");
@@ -392,28 +394,34 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
          *   -       65.20          -        (TOF S1)
          *   1       62.87          6
          *   -       62.10          -        (TOF S2)
-         *   2       53.06          7
-         *   3      -61.33         15
+         *   2       53.06          7        (TR  L2)
+         *   3       29.23          8        (TR  L3)
+         *   4       25.21          9        (TR  L4)
+         *   5      -61.33         15
          *   -      -62.10          -        (TOF S3)
-         *   4      -63.27         14
+         *   6      -63.27         14
          *   -      -65.20          -        (TOF S4)
-         *   5      -69.98         17
+         *   7      -69.98         17
          */
-        double kineticEnergy[6]{};
+        double kineticEnergy[8]{};
         kineticEnergy[0] = sqrt(mevmom1[4] * mevmom1[4] + mass * mass) - mass;
         kineticEnergy[1] = sqrt(mevmom1[6] * mevmom1[6] + mass * mass) - mass;
         kineticEnergy[2] = sqrt(mevmom1[7] * mevmom1[7] + mass * mass) - mass;
-        kineticEnergy[3] = sqrt(mevmom1[15] * mevmom1[15] + mass * mass) - mass;
-        kineticEnergy[4] = sqrt(mevmom1[14] * mevmom1[14] + mass * mass) - mass;
-        kineticEnergy[5] = sqrt(mevmom1[17] * mevmom1[17] + mass * mass) - mass;
+        kineticEnergy[3] = sqrt(mevmom1[8] * mevmom1[8] + mass * mass) - mass;
+        kineticEnergy[4] = sqrt(mevmom1[9] * mevmom1[9] + mass * mass) - mass;
+        kineticEnergy[5] = sqrt(mevmom1[15] * mevmom1[15] + mass * mass) - mass;
+        kineticEnergy[6] = sqrt(mevmom1[14] * mevmom1[14] + mass * mass) - mass;
+        kineticEnergy[7] = sqrt(mevmom1[17] * mevmom1[17] + mass * mass) - mass;
 
         energyDepositedS1S2 = (tof_edep[0] + tof_edep[1]) * 1e-3;
         energyDepositedTotal = (tof_edep[0] + tof_edep[1] + tof_edep[2] + tof_edep[3]) * 1e-3;
         energyLoss_S1S2_ = kineticEnergy[0] - kineticEnergy[2];
-        energyLoss_S1S4_ = kineticEnergy[0] - kineticEnergy[5];
+        energyLoss_S1L3 = kineticEnergy[0] - kineticEnergy[3];
+        energyLoss_S1L4 = kineticEnergy[0] - kineticEnergy[4];
+        energyLoss_S1S4_ = kineticEnergy[0] - kineticEnergy[7];
         energyLossScaleS1S2 = energyLoss_S1S2_ / energyDepositedS1S2;
         energyLossScaleTotal = energyLoss_S1S4_ / energyDepositedTotal;
-        energyLossS2__S3 = kineticEnergy[2] - kineticEnergy[3];
+        energyLossS2__S3 = kineticEnergy[2] - kineticEnergy[5];
         energyLossS2S3_Total = energyLossS2__S3 / energyLoss_S1S4_;
         mcBeta = mevmom1[4] / sqrt(mevmom1[4] * mevmom1[4] + mass * mass);
 
@@ -560,4 +568,8 @@ bool Util::benchmarkBetaNL(const std::string &inputFile, const std::string &outp
     std::cout << "Average time per Beta() call: " << averageTimeMs << " milliseconds" << std::endl;
 
     return true;
+}
+
+void Util::test(){
+    Betalhd::CalculateEnergyLoss(AMSPoint(0, 0, 0), AMSDir(0, 0, 1), 0, 0, 0);
 }
