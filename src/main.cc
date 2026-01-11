@@ -13,6 +13,7 @@ int main(int argc, char **argv)
         std::cout << "   0: Save beta information to ROOT file" << std::endl;
         std::cout << "   1: Save energy loss scacle information to ROOT file" << std::endl;
         std::cout << "   2: Benchmark BetaNL::Beta() function execution time" << std::endl;
+        std::cout << "   3: Save beta difference information to ROOT file" << std::endl;
         return 1;
     }
 
@@ -40,8 +41,10 @@ int main(int argc, char **argv)
         return Util::saveEnergyLossScale(inputFile, outputFile) ? 0 : 1;
     case 2:
         return Util::benchmarkBetaNL(inputFile, outputFile, energyLossScale) ? 0 : 1;
+    case 3:
+        return Util::saveBetaDiff(inputFile, outputFile, energyLossScale) ? 0 : 1;
     default:
-        std::cerr << "Error: Invalid option " << Option << std::endl;
+        Util::test();
         return 1;
     }
 }

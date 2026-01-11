@@ -127,20 +127,6 @@ void plotEnergyLoss(std::string fileName = "test.root",
     double energyLossS2S3_TotalMin = energyLossS2S3_TotalRange.first;
     double energyLossS2S3_TotalMax = energyLossS2S3_TotalRange.second;
 
-    // Add some margin to ranges (5%)
-    auto addMargin = [](double min, double max) {
-        double margin = 0.05 * (max - min);
-        return std::make_pair(min - margin, max + margin);
-    };
-
-    // Apply margins to ranges
-    std::tie(energyLossScaleS1S2Min, energyLossScaleS1S2Max) = addMargin(energyLossScaleS1S2Min, energyLossScaleS1S2Max);
-    std::tie(energyLossScaleTotalMin, energyLossScaleTotalMax) = addMargin(energyLossScaleTotalMin, energyLossScaleTotalMax);
-    std::tie(energyLossS2__S3Min, energyLossS2__S3Max) = addMargin(energyLossS2__S3Min, energyLossS2__S3Max);
-    std::tie(energyLossS2S3_TotalMin, energyLossS2S3_TotalMax) = addMargin(energyLossS2S3_TotalMin, energyLossS2S3_TotalMax);
-    std::tie(energyDepositedS1S2Min, energyDepositedS1S2Max) = addMargin(energyDepositedS1S2Min, energyDepositedS1S2Max);
-    std::tie(energyLoss_S1S2_Min, energyLoss_S1S2_Max) = addMargin(energyLoss_S1S2_Min, energyLoss_S1S2_Max);
-
     // Number of bins for histograms
     int nBins = 100;  // Number of bins for 1D histograms
     int nBinsX = 40;  // Number of bins in X direction (beta) for 2D histograms

@@ -80,6 +80,8 @@ namespace Util
      */
     bool benchmarkBetaNL(const std::string &inputFile, const std::string &outputFile, double energyLossScale = 2);
 
+    bool saveBetaDiff(const std::string &inputFile, const std::string &outputFile, double energyLossScale = 2);
+
     void test();
 }
 
