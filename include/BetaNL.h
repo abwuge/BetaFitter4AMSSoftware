@@ -1,26 +1,6 @@
 #ifndef __BETANL_H__
 #define __BETANL_H__
 
-///////////////////////////////////////////////////////////////
-///
-///\file  BetaNL.h
-///
-///\class BetaNLPars
-///\brief Parameters for the beta non-linear reconstruction
-///
-///\date  2025/3/15 HW First stable version
-///
-///\class BetaNL
-///\brief Non-linear beta reconstruction
-///
-///\date  2025/3/15 HW First stable version
-///$Date: 2023/12/08 15:32:50 $
-///
-///$Revision: 1.0 $
-///////////////////////////////////////////////////////////////
-
-#include "TrFit.h"
-
 /**
  * @class BetaNLPars
  * @brief Parameters for the beta non-linear reconstruction
@@ -138,7 +118,7 @@ private:
     BetaNLPars(double beta, double mass)
         : _beta(beta), _mass(mass) {};
 
-    void initPathLength();
+    void init();
 
 private:
     // Particle Information

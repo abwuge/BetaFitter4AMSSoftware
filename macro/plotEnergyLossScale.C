@@ -200,7 +200,7 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     canvas1->SetGridy();
     canvas1->SetLogy();
 
-    tree->Draw("energyLossScale>>hEnergyLossScale", "mcBeta < 0.95");
+    tree->Draw("energyLossScale>>hEnergyLossScale", "mcBeta < 0.5");
     hEnergyLossScale->SetLineColor(kBlue);
     hEnergyLossScale->SetLineWidth(2);
     hEnergyLossScale->SetFillColor(kBlue - 10);

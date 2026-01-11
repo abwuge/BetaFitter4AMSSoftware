@@ -1,16 +1,3 @@
-
-//////////////////////////////////////////////////////////////////////////
-///
-///\file  BetaNL.C
-///\brief Source file of BetaNLPars & BetaNL class
-///
-///\date  2025/3/15 HW First stable version
-///$Date: 2023/12/08 15:32:50 $
-///
-///$Revision: 1.0 $
-///
-//////////////////////////////////////////////////////////////////////////
-
 #include "BetaNL.h"
 
 #include <Math/Factory.h>
@@ -31,7 +18,7 @@ BetaNLPars::BetaNLPars(
     _hitTime = hitTime;
     _hitTimeError = hitTimeError;
     _pathLength = pathLength;
-    initPathLength();
+    init();
 }
 
 BetaNLPars::BetaNLPars(
@@ -47,7 +34,7 @@ BetaNLPars::BetaNLPars(
     _hitTime.assign(hitTime, hitTime + nTOF);
     _hitTimeError.assign(hitTimeError, hitTimeError + nTOF);
     _pathLength.assign(pathLength, pathLength + nTOF);
-    initPathLength();
+    init();
 }
 
 BetaNLPars::BetaNLPars(
@@ -63,12 +50,15 @@ BetaNLPars::BetaNLPars(
     _hitTime.assign(hitTime, hitTime + nTOF);
     _hitTimeError.assign(hitTimeError, hitTimeError + nTOF);
     _pathLength.assign(pathLength, pathLength + nTOF);
-    initPathLength();
+    init();
 }
 
-void BetaNLPars::initPathLength()
+void BetaNLPars::init()
 {
-    for (int i = 0; i < 4; ++i)
+    for (auto &edep : _energyDeposited)
+        edep *= 1e-3;
+
+    for (int i = 0; i < 3; ++i)
         _pathLength[i] = _pathLength[i] - _pathLength[i + 1];
 
     _pathLength[3] = 0;

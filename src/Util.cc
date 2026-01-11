@@ -89,7 +89,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     {
         tree->GetEntry(i);
 
-        if (mevmom1[17] == -1000)
+        if (mevmom1[3] == -1000)
             continue;
 
         ParticleData data;
@@ -110,7 +110,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
             data.mcInitDir[1] = mevdir1[4][1];
             data.mcInitDir[2] = mevdir1[4][2];
 
-            float mmom = mevmom1[17];
+            float mmom = mevmom1[3];
             data.mcMomentum = mmom;
             data.mcBeta = mmom / sqrt(mmom * mmom + mmass * mmass);
         }
@@ -130,7 +130,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
             data.TOF_hitTime[j] = tof_tl[j];
             // TODO: SO FAR it's constant, but it might not be correct
             data.TOF_hitTimeError[j] = 0.1544809;
-            data.TOF_hitEdep[j] = tof_edep[j] * 1e-3;
+            data.TOF_hitEdep[j] = tof_edep[j];
             data.TOF_length[j] = tof_leng[j];
         }
 
@@ -323,7 +323,7 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
     }
 
     int tof_qs = 0; // Q Status (1111: all unoverlapped, 0000: all overlapped, left to right: S1, S2, S3, S4)
-    int mpar = 0;
+    int mpar = 0;  
     float mch = 0.0f;
     float mevmom1[21]{};
     float tof_edep[4]{};
@@ -350,8 +350,8 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
     float energyDepositedS1S2 = 0.0;  // energy deposited from before S1 to after S2
     float energyDepositedTotal = 0.0; // total energy deposited
     float energyLoss_S1S2_ = 0.0;     // energy loss from before S1 to after S2
-    float energyLoss_S1L3 = 0.0;     // energy loss from before S1 to L3
-    float energyLoss_S1L4 = 0.0;     // energy loss from before S1 to L4
+    float energyLoss_S1L3 = 0.0;      // energy loss from before S1 to L3
+    float energyLoss_S1L4 = 0.0;      // energy loss from before S1 to L4
     float energyLoss_S1S4_ = 0.0;     // energy loss from before S1 to after S4
     float energyLossScaleS1S2 = 0.0;  // energy loss scale factor from before S1 to after S2
     float energyLossScaleTotal = 0.0; // energy loss scale factor from before S1 to after S4
@@ -390,6 +390,7 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
         /**
          * Kinetic energy index - z-position:
          * Index     Z (cm)     MC Index
+         *   -       64.43          3
          *   0       65.97          4
          *   -       65.20          -        (TOF S1)
          *   1       62.87          6
@@ -570,6 +571,129 @@ bool Util::benchmarkBetaNL(const std::string &inputFile, const std::string &outp
     return true;
 }
 
-void Util::test(){
-    Betalhd::CalculateEnergyLoss(AMSPoint(0, 0, 0), AMSDir(0, 0, 1), 0, 0, 0);
+bool Util::saveBetaDiff(const std::string &inputFile, const std::string &outputFile, double energyLossScale)
+{
+    TFile *fileIn = TFile::Open(inputFile.c_str(), "READ");
+    if (!fileIn || fileIn->IsZombie())
+    {
+        std::cerr << "Error: Could not open file " << inputFile << std::endl;
+        return false;
+    }
+
+    TTree *treeIn = (TTree *)fileIn->Get("amstreea");
+    if (!treeIn)
+    {
+        std::cerr << "Error: Could not find amstreea tree in " << inputFile << std::endl;
+        fileIn->Close();
+        return false;
+    }
+
+    if (!treeIn->GetBranch("mpar"))
+    {
+        std::cerr << "Error: Could not find Monte Carlo information in " << inputFile << std::endl;
+        fileIn->Close();
+        return false;
+    }
+
+    float tof_betah{};
+    float mevmom1[21]{};
+    float mevcoo1[21][3]{};
+    float tk_q[2]{};
+    float tk_qin[2][3]{};
+    float tof_edep[4]{};
+    float tof_tl[4]{};
+    float tof_tres[4]{};
+    float tof_leng[4]{};
+
+    treeIn->SetBranchAddress("tof_betah", &tof_betah);
+    treeIn->SetBranchAddress("mevmom1", mevmom1);
+    treeIn->SetBranchAddress("mevcoo1", mevcoo1);
+    treeIn->SetBranchAddress("tk_q", tk_q);
+    treeIn->SetBranchAddress("tk_qin", tk_qin);
+    treeIn->SetBranchAddress("tof_edep", tof_edep);
+    treeIn->SetBranchAddress("tof_tl", tof_tl);
+    treeIn->SetBranchAddress("tof_tres", tof_tres);
+    treeIn->SetBranchAddress("tof_leng", tof_leng);
+
+    TFile *fileOut = new TFile(outputFile.c_str(), "RECREATE");
+    if (!fileOut || fileOut->IsZombie())
+    {
+        std::cerr << "Error: Could not create output file " << outputFile << std::endl;
+        return false;
+    }
+
+    TTree *treeOut = new TTree("betaDiff", "beta difference");
+
+    float linearBeta{};
+    float nonlinearBeta{};
+    float mcBeta[21]{};
+
+    treeOut->Branch("linearBeta", &linearBeta, "linearBeta/F");
+    treeOut->Branch("nonlinearBeta", &nonlinearBeta, "nonlinearBeta/F");
+    treeOut->Branch("mcBeta", mcBeta, "mcBeta[21]/F");
+    treeOut->Branch("mevmom1", mevmom1, "mevmom1[21]/F");
+    treeOut->Branch("mevcoo1", mevcoo1, "mevcoo1[21][3]/F");
+    treeOut->Branch("tof_tres", tof_tres, "tof_tres[4]/F");
+    float tof_etl[4] = {0.1544809, 0.1544809, 0.1544809, 0.1544809};
+
+    for (Long64_t i = 0; i < treeIn->GetEntries(); ++i)
+    {
+        treeIn->GetEntry(i);
+
+        float charge = (int)((tk_qin[0][2] < 2.5 ? tk_q[1] : tk_qin[0][2]) + 0.5);
+        float mass = 2 * charge * 0.9314941;
+
+        linearBeta = tof_betah;
+        nonlinearBeta =
+            BetaNL(
+                BetaNLPars(
+                    tof_betah,
+                    mass,
+                    tof_edep,
+                    tof_tl,
+                    tof_etl,
+                    tof_leng),
+                energyLossScale)
+                .Beta();
+
+        for (int j = 0; j < 21; ++j)
+            if (mevmom1[j] != -1000)
+                mcBeta[j] = mevmom1[j] / sqrt(mevmom1[j] * mevmom1[j] + mass * mass);
+            else
+                mcBeta[j] = -1000;
+
+        treeOut->Fill();
+    }
+
+    treeOut->Write();
+    fileOut->Close();
+    fileIn->Close();
+
+    return true;
+}
+
+void Util::test()
+{
+    AMSChain *ch0 = new AMSChain();
+    // ch0->Add("root/be10.82318769.00000001.root");
+    ch0->Add("/lustre02/data/ams/MC/AMS02/2022.v6.00/Li.B1308/li6.pl1.l1.36000.6_05/1686725052.00000001.root");
+    std::cout << ch0->GetEntries() << std::endl;
+    for (int ievt = 0; ievt < ch0->GetEntries(); ievt++)
+    {
+        AMSEventR *evt = ch0->GetEvent(ievt);
+
+        int ntrack = evt->NTrTrack();
+        if (ntrack != 2)
+            continue;
+
+        int nparticle = evt->NParticle();
+        if (nparticle != 1)
+            continue;
+
+        auto particles = evt->Particle();
+        if (particles[0].iCharge() != 3)
+            continue;
+
+        std::cout << evt->Event() << std::endl;
+    }
 }

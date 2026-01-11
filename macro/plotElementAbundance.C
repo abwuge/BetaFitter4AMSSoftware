@@ -20,9 +20,14 @@
  * @param outputName Base name for output files (without extension)
  */
 void plotElementAbundance(
-    const char *sfn = "/cvmfs/ams.cern.ch/Offline/AMSDataDir/v6.00/LAPP/dEdxPDF/g4mscan.root",
-    const char *outputName = "test_MaterialAbundanceMap.pdf")
+    double zMin = 86.10,
+    double zMax = 64.425,
+    const char *outputName = "test_MaterialAbundanceMap.pdf",
+    const char *sfn = "/cvmfs/ams.cern.ch/Offline/AMSDataDir/v6.00/LAPP/dEdxPDF/g4mscan.root")
 {
+    if (zMin > zMax)
+        std::swap(zMin, zMax);
+
     // Set batch mode and style
     // ------------------------------------------------------------------------
 
@@ -45,10 +50,8 @@ void plotElementAbundance(
     // range
     double xMin = -60;
     double yMin = -60;
-    double zMin = -72;
     double xMax = 60;
     double yMax = 60;
-    double zMax = -68;
 
     // Open file
     // ------------------------------------------------------------------------
