@@ -67,7 +67,7 @@ while IFS= read -r input_file; do
     ((counter++))
     
     # Run the process in background
-    ("${SCRIPT_DIR}/run.csh" "$input_file" "$output_file" "$fitOption" "$energyLossScale" > "$log_file" 2>&1) &
+    ("${SCRIPT_DIR}/run.sh" "$input_file" "$output_file" "$fitOption" "$energyLossScale" > "$log_file" 2>&1) &
     
     # Store the PID of the background process
     CHILD_PIDS+=($!)
