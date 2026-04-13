@@ -130,7 +130,7 @@ std::vector<double> BetaNL::propagate(double beta) const
 
     for (int i = 1; i < BetaNLPars::nTOF; ++i)
     {
-        energy += deps[i - 1] * _energyLossScale;
+        energy -= deps[i - 1] * _energyLossScale;
         const double inv_beta = 1.0 / std::sqrt(1.0 - massSquared / (energy * energy));
         hitTimes[i] = hitTimes[i - 1] + paths[i] * inv_c * inv_beta;
     }
