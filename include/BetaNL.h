@@ -1,6 +1,10 @@
 #ifndef __BETANL_H__
 #define __BETANL_H__
 
+#include <vector>
+#include <cmath>
+#include <memory>
+
 /**
  * @class BetaNLPars
  * @brief Parameters for the beta non-linear reconstruction
@@ -112,7 +116,7 @@ public:
      * @note > 0 for positive charge, < 0 for negative charge
      * @return Momentum (GeV/c)
      */
-    double Momentum() const { return _mass * _beta / sqrt(1 - _beta * _beta); }
+    double Momentum() const { return _mass * _beta / std::sqrt(1 - _beta * _beta); }
 
 private:
     BetaNLPars(double beta, double mass)

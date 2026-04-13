@@ -89,7 +89,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     {
         tree->GetEntry(i);
 
-        if (mevmom1[3] == -1000)
+        if (mevmom1[4] == -1000)
             continue;
 
         ParticleData data;
@@ -110,7 +110,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
             data.mcInitDir[1] = mevdir1[4][1];
             data.mcInitDir[2] = mevdir1[4][2];
 
-            float mmom = mevmom1[3];
+            float mmom = mevmom1[4];
             data.mcMomentum = mmom;
             data.mcBeta = mmom / sqrt(mmom * mmom + mmass * mmass);
         }
@@ -323,7 +323,7 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
     }
 
     int tof_qs = 0; // Q Status (1111: all unoverlapped, 0000: all overlapped, left to right: S1, S2, S3, S4)
-    int mpar = 0;  
+    int mpar = 0;
     float mch = 0.0f;
     float mevmom1[21]{};
     float tof_edep[4]{};

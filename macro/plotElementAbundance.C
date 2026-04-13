@@ -20,7 +20,7 @@
  * @param outputName Base name for output files (without extension)
  */
 void plotElementAbundance(
-    double zMin = 86.10,
+    double zMin = 65.975,
     double zMax = 64.425,
     const char *outputName = "test_MaterialAbundanceMap.pdf",
     const char *sfn = "/cvmfs/ams.cern.ch/Offline/AMSDataDir/v6.00/LAPP/dEdxPDF/g4mscan.root")
