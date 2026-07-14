@@ -3,9 +3,10 @@
 #include <iostream>
 
 #include <TFile.h>
+#include <TSystem.h>
 #include <TTree.h>
 
-void selectHadd(std::string inputFileList = "input_Z2.list", const char *outputFile = "test_sel_Z2.root")
+void selectHadd(std::string inputFileList = "input_Z2.list", const char *outputFile = "results/selected_Z2.root")
 {
     if (inputFileList.size() < 13 || inputFileList.substr(inputFileList.size() - 5) != ".list")
         inputFileList = "input_Z" + inputFileList + ".list";
@@ -17,6 +18,7 @@ void selectHadd(std::string inputFileList = "input_Z2.list", const char *outputF
         return;
     }
 
+    gSystem->mkdir(gSystem->DirName(outputFile), true);
     TFile *output = new TFile(outputFile, "RECREATE");
     if (!output || output->IsZombie())
     {

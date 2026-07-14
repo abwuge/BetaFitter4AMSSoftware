@@ -8,12 +8,10 @@ build/*
 # Ignore IDE files
 .vscode/*
 
-# Ignore test files
-*test*
-
 # Ignore articles
 articles/*
 
 # Ignore results & logs
 results/*
 logs/*
+macro/results/*

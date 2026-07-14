@@ -14,6 +14,7 @@
 #include <fstream>
 #include <vector>
 #include <TFitResult.h>
+#include "beta_fitter_macro_utils.h"
 
 /**
  * Get Z value and energyLossScale for a file from README.md
@@ -112,10 +113,12 @@ std::pair<int, double> getParamsFromReadme(const std::string &fileName)
  * Draw beta comparison plots from a ROOT file containing betaTree
  *
  * @param fileName Path to the input ROOT file
- * @param outputName Output file name (default: auto-generated based on Z and ELS values)
+ * @param outputName Explicit output path; uses the unified result directory when omitted
+ * @param outputTag Result subdirectory under macro/results
  */
 void plotBetaComparison(std::string fileName = "test.root",
-                        const char *outputName = nullptr)
+                        const char *outputName = nullptr,
+                        const char *outputTag = "beta_comparison")
 {
     gROOT->SetBatch(true);
     gROOT->SetStyle("Pub");
@@ -150,16 +153,18 @@ void plotBetaComparison(std::string fileName = "test.root",
     auto params = getParamsFromReadme(fileName);
     int zValue = params.first;
     double energyLossScale = params.second;
-    std::string actualOutputName;
+    TString defaultOutputName;
+    TString resolvedOutputName;
 
     // Set output name
     if (!outputName)
     {
         if (zValue > 0 && energyLossScale > 0)
-            actualOutputName = Form("test_beta_Z%d_zeta%.3f.pdf", zValue, energyLossScale);
+            defaultOutputName = Form("beta_Z%d_zeta%.3f.pdf", zValue, energyLossScale);
         else
-            actualOutputName = "test_beta_comparison.pdf";
-        outputName = actualOutputName.c_str();
+            defaultOutputName = "beta_comparison.pdf";
+        resolvedOutputName = BetaFitterMacro::output_path(nullptr, outputTag, defaultOutputName);
+        outputName = resolvedOutputName.Data();
     }
 
     // Get tree

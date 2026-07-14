@@ -15,6 +15,7 @@
 #include <TGraphErrors.h>
 #include <TMath.h>
 #include <TFitResult.h>
+#include "beta_fitter_macro_utils.h"
 
 /**
  * Get Z value for a file from README.md
@@ -84,10 +85,12 @@ int getParamsFromReadme(const std::string &fileName)
  * Draw energy loss scale distribution from a ROOT file containing scaleTree tree
  *
  * @param fileName Path to the input ROOT file
- * @param outputName Output file name
+ * @param outputName Explicit output path; uses the unified result directory when omitted
+ * @param outputTag Result subdirectory under macro/results
  */
 void plotEnergyLossScale(std::string fileName = "test.root",
-                         const char *outputName = nullptr)
+                         const char *outputName = nullptr,
+                         const char *outputTag = "energy_loss")
 {
     // Set batch mode to avoid GUI related issues
     gROOT->SetBatch(true);
@@ -117,14 +120,16 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     // Get Z value and energyLossScale from the file
     int zValue = getParamsFromReadme(fileName);
 
-    std::string actualOutputName;
+    TString defaultOutputName;
+    TString resolvedOutputName;
     if (!outputName)
     {
         if (zValue > 0)
-            actualOutputName = Form("test_zeta_Z%d.pdf", zValue);
+            defaultOutputName = Form("energy_loss_scale_Z%d.pdf", zValue);
         else
-            actualOutputName = "test_zeta.pdf";
-        outputName = actualOutputName.c_str();
+            defaultOutputName = "energy_loss_scale.pdf";
+        resolvedOutputName = BetaFitterMacro::output_path(nullptr, outputTag, defaultOutputName);
+        outputName = resolvedOutputName.Data();
     }
 
     // Get the energy loss scale tree

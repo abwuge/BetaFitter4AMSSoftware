@@ -14,6 +14,7 @@
 #include <fstream>
 #include <vector>
 #include <TFitResult.h>
+#include "beta_fitter_macro_utils.h"
 
 /**
  * Draw plots with log(Ek/n) as x-axis (displayed as Ek/n) and means of
@@ -27,8 +28,13 @@
 void plotRingBetaResiduals(
     std::string fileName = "test.root",
     int nucleonNumber = 4,
-    const char *outputName = "test_ring_beta_residuals.pdf")
+    const char *outputName = nullptr,
+    const char *outputTag = "beta_comparison")
 {
+    TString resolvedOutputName = BetaFitterMacro::output_path(
+        outputName, outputTag, "ring_beta_residuals.pdf");
+    outputName = resolvedOutputName.Data();
+
     gROOT->SetBatch(true);
     gROOT->SetStyle("Pub");
     gStyle->SetLineWidth(2);

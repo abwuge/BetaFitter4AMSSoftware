@@ -18,6 +18,7 @@
 #include <array>
 #include <algorithm>
 #include <map>
+#include "beta_fitter_macro_utils.h"
 
 const int nBinsX = 40;
 const int nBinsY = 100;
@@ -307,10 +308,12 @@ Data getData(std::string fileName, const std::string branch = "nonlinearBeta", c
  * Draw beta comparison plots from multiple ROOT files containing betaTree
  *
  * @param fileNames Array of paths to the input ROOT files
- * @param outputName Output file name (default: "test_multiple_beta_comparison.pdf")
+ * @param outputName Explicit output path; uses the unified result directory when omitted
+ * @param outputTag Result subdirectory under macro/results
  */
 void plotMultipleBetaComparison(const std::vector<std::string> &fileNames,
-                                const char *outputName = nullptr)
+                                const char *outputName = nullptr,
+                                const char *outputTag = "beta_comparison")
 {
     if (fileNames.empty())
     {
@@ -329,16 +332,18 @@ void plotMultipleBetaComparison(const std::vector<std::string> &fileNames,
 
     // Get Z value and energyLossScale from the file
     double Z = getParamFromReadme(fileNames[0], true);
-    std::string actualOutputName;
+    TString defaultOutputName;
+    TString resolvedOutputName;
 
     // Set output name
     if (!outputName)
     {
         if (Z > 0)
-            actualOutputName = Form("test_multiple_beta_Z%.0f.pdf", Z);
+            defaultOutputName = Form("multiple_beta_Z%.0f.pdf", Z);
         else
-            actualOutputName = "test_multiple_beta_comparison.pdf";
-        outputName = actualOutputName.c_str();
+            defaultOutputName = "multiple_beta_comparison.pdf";
+        resolvedOutputName = BetaFitterMacro::output_path(nullptr, outputTag, defaultOutputName);
+        outputName = resolvedOutputName.Data();
     }
 
     // Create canvas

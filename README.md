@@ -66,22 +66,26 @@
 
 项目提供了多种数据分析和可视化工具：
 
+图像默认统一保存到 `macro/results/<分析类别>/`。例如，Beta 对比图位于
+`macro/results/beta_comparison/`，能损图位于 `macro/results/energy_loss/`。
+宏的 `outputName` 参数仍可用于指定其他完整输出路径。
+
 ### Beta比较分析
 
 ```bash
-root -l 'macro/plotBetaComparison.C("test.root", "beta_comparison.pdf")'
+root -l 'macro/plotBetaComparison.C("test.root")'
 ```
 
 ### 能量损失分析
 
 ```bash
-root -l 'macro/plotEnergyLoss.C("test_el.root", "energy_loss.pdf")'
+root -l 'macro/plotEnergyLoss.C("test_el.root")'
 ```
 
 ### 磁场分析
 
 ```bash
-root -l 'macro/plotMagneticField.C(0.0, 0.0, "test.root", "magnetic_field.pdf")'
+root -l 'macro/plotMagneticField.C(0.0, 0.0, "test.root")'
 ```
 
 ## 结果分析

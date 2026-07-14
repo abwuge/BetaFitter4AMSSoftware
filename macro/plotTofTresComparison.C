@@ -15,6 +15,7 @@
 #include <vector>
 #include <TFitResult.h>
 #include <array>
+#include "beta_fitter_macro_utils.h"
 
 /**
  * Draw plots of tof_tres[4] time residual values for different TOF paddles
@@ -25,8 +26,13 @@
  */
 void plotTofTresComparison(
     std::string fileName = "test.root",
-    const char *outputName = "test_tof_tres_comparison.pdf")
+    const char *outputName = nullptr,
+    const char *outputTag = "tof_diagnostics")
 {
+    TString resolvedOutputName = BetaFitterMacro::output_path(
+        outputName, outputTag, "tof_time_residuals.pdf");
+    outputName = resolvedOutputName.Data();
+
     gROOT->SetBatch(true);
     gROOT->SetStyle("Pub");
     gStyle->SetLineWidth(2);

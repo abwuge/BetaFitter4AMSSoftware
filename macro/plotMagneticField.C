@@ -9,6 +9,7 @@
 #include <map>
 #include <vector>
 #include <utility>
+#include "beta_fitter_macro_utils.h"
 
 /**
  * Plot magnetic field projections on XZ and YZ planes passing through specified points
@@ -22,8 +23,12 @@
 void plotMagneticField(Double_t xzPlaneY = 0.0,
                        Double_t yzPlaneX = 0.0,
                        const char *inputFile = "test.root",
-                       TString outFileName = "test_magnetic_field_projections.pdf")
+                       const char *outputName = nullptr,
+                       const char *outputTag = "detector_maps")
 {
+    TString outFileName = BetaFitterMacro::output_path(
+        outputName, outputTag, "magnetic_field_projections.pdf");
+
     // Use batch mode to avoid GUI issues
     gROOT->SetBatch(true);
 

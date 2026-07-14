@@ -10,6 +10,7 @@
 #include <TROOT.h>
 #include <TLatex.h>
 #include <iostream>
+#include "beta_fitter_macro_utils.h"
 
 /**
  * Plot element abundance from AMS material scan file
@@ -22,9 +23,14 @@
 void plotElementAbundance(
     double zMin = 65.975,
     double zMax = 64.425,
-    const char *outputName = "test_MaterialAbundanceMap.pdf",
-    const char *sfn = "/cvmfs/ams.cern.ch/Offline/AMSDataDir/v6.00/LAPP/dEdxPDF/g4mscan.root")
+    const char *outputName = nullptr,
+    const char *sfn = "/cvmfs/ams.cern.ch/Offline/AMSDataDir/v6.00/LAPP/dEdxPDF/g4mscan.root",
+    const char *outputTag = "detector_maps")
 {
+    TString resolvedOutputName = BetaFitterMacro::output_path(
+        outputName, outputTag, "material_abundance.pdf");
+    outputName = resolvedOutputName.Data();
+
     if (zMin > zMax)
         std::swap(zMin, zMax);
 

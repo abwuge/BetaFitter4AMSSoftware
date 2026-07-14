@@ -14,11 +14,17 @@
 #include <fstream>
 #include <vector>
 #include <TFitResult.h>
+#include "beta_fitter_macro_utils.h"
 
 void plotRealDataBetaComparison(std::string fileName = "test.root",
                                 const char *restrict = "",
-                                const char *outputName = "test_real_beta_comparison.pdf")
+                                const char *outputName = nullptr,
+                                const char *outputTag = "beta_comparison")
 {
+    TString resolvedOutputName = BetaFitterMacro::output_path(
+        outputName, outputTag, "real_data_beta_comparison.pdf");
+    outputName = resolvedOutputName.Data();
+
     gROOT->SetBatch(true);
     gROOT->SetStyle("Pub");
     gStyle->SetLineWidth(2);

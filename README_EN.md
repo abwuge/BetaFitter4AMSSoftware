@@ -66,22 +66,27 @@ Or use the local processing script:
 
 The project provides various data analysis and visualization tools:
 
+Plots are stored under `macro/results/<analysis-category>/` by default. For
+example, beta comparisons go to `macro/results/beta_comparison/`, while energy
+loss plots go to `macro/results/energy_loss/`. The `outputName` argument still
+accepts an explicit output path when needed.
+
 ### Beta Comparison Analysis
 
 ```bash
-root -l 'macro/plotBetaComparison.C("test.root", "beta_comparison.pdf")'
+root -l 'macro/plotBetaComparison.C("test.root")'
 ```
 
 ### Energy Loss Analysis
 
 ```bash
-root -l 'macro/plotEnergyLoss.C("test_el.root", "energy_loss.pdf")'
+root -l 'macro/plotEnergyLoss.C("test_el.root")'
 ```
 
 ### Magnetic Field Analysis
 
 ```bash
-root -l 'macro/plotMagneticField.C(0.0, 0.0, "test.root", "magnetic_field.pdf")'
+root -l 'macro/plotMagneticField.C(0.0, 0.0, "test.root")'
 ```
 
 ## Results Analysis

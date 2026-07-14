@@ -11,16 +11,23 @@
 #include <string>
 #include <TMath.h>
 #include <TGraphErrors.h>
+#include "beta_fitter_macro_utils.h"
 
 /**
  * Draw energy loss distributions from a ROOT file containing energyLoss tree
  *
  * @param fileName Path to the input ROOT file
- * @param outputName Output file name
+ * @param outputName Explicit output path; uses the unified result directory when omitted
+ * @param outputTag Result subdirectory under macro/results
  */
 void plotEnergyLoss(std::string fileName = "test.root",
-                    const char *outputName = "test_energy_loss_plots.pdf")
+                    const char *outputName = nullptr,
+                    const char *outputTag = "energy_loss")
 {
+    TString resolvedOutputName = BetaFitterMacro::output_path(
+        outputName, outputTag, "energy_loss.pdf");
+    outputName = resolvedOutputName.Data();
+
     // Set batch mode to avoid GUI related issues
     gROOT->SetBatch(true);
     gROOT->SetStyle("Pub");
