@@ -155,6 +155,7 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     double energyLossScaleMax = 10;
     double mcBetaMin = tree->GetMinimum("mcBeta");
     double mcBetaMax = tree->GetMaximum("mcBeta");
+    const double mcBetaSelectionMax = 0.5;
 
     // Number of bins for histograms
     int nBins = 100;
@@ -205,7 +206,7 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     canvas1->SetGridy();
     canvas1->SetLogy();
 
-    tree->Draw("energyLossScale>>hEnergyLossScale", "mcBeta < 0.5");
+    tree->Draw("energyLossScale>>hEnergyLossScale", Form("mcBeta < %.1f", mcBetaSelectionMax));
     hEnergyLossScale->SetLineColor(kBlue);
     hEnergyLossScale->SetLineWidth(2);
     hEnergyLossScale->SetFillColor(kBlue - 10);
@@ -217,9 +218,9 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     infoText->SetBorderSize(0);
 
     if (zValue > 0)
-        infoText->AddText(Form("Z = %d, mcBeta < 0.9", zValue));
+        infoText->AddText(Form("Z = %d, mcBeta < %.1f", zValue, mcBetaSelectionMax));
     else
-        infoText->AddText(Form("mcBeta < 0.9"));
+        infoText->AddText(Form("mcBeta < %.1f", mcBetaSelectionMax));
 
     infoText->Draw();
 
