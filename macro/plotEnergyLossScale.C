@@ -155,7 +155,7 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     double energyLossScaleMax = 10;
     double mcBetaMin = tree->GetMinimum("mcBeta");
     double mcBetaMax = tree->GetMaximum("mcBeta");
-    const double mcBetaSelectionMax = 0.5;
+    const double mcBetaSelectionMax = 0.9;
 
     // Number of bins for histograms
     int nBins = 100;
