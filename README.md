@@ -62,6 +62,13 @@
 ./run_local.sh
 ```
 
+能损缩放范围可通过最后一个参数在当前的全部前三层（`all`，默认）和仅 S2（`s2`）之间切换：
+
+```bash
+./run.sh input.root output.root 0 1.9 s2
+./run_local.sh 2 0 1.9 100 s2
+```
+
 ## 数据分析
 
 项目提供了多种数据分析和可视化工具：

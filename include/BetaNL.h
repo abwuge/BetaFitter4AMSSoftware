@@ -5,6 +5,12 @@
 #include <cmath>
 #include <memory>
 
+enum class EnergyLossScaleMode
+{
+    All,
+    S2Only
+};
+
 /**
  * @class BetaNLPars
  * @brief Parameters for the beta non-linear reconstruction
@@ -164,9 +170,12 @@ public:
      * Constructor with BetaNLPars
      * @param pars Parameters for the beta non-linear reconstruction
      */
-    BetaNL(BetaNLPars pars, double energyLossScale = 2)
+    BetaNL(BetaNLPars pars,
+           double energyLossScale = 2,
+           EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All)
         : _pars(std::make_shared<BetaNLPars>(pars)),
-          _energyLossScale(energyLossScale) {};
+          _energyLossScale(energyLossScale),
+          _energyLossScaleMode(energyLossScaleMode) {};
 
     /**
      * Destructor
@@ -211,6 +220,7 @@ private:
     std::shared_ptr<BetaNLPars> _pars;          // Parameters for the beta non-linear reconstruction
     std::shared_ptr<double> _invBeta = nullptr; // Reconstructed 1/beta value
     double _energyLossScale = 2;                // Energy loss scale factor
+    EnergyLossScaleMode _energyLossScaleMode = EnergyLossScaleMode::All;
     double _timeOffset = 0;                     // Reconstructed time offset in ns
 };
 

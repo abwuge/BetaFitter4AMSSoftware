@@ -42,7 +42,10 @@ namespace Util
      * @param outputFile Path to save the ROOT file containing fit results
      * @return bool True if fit succeeds, false otherwise
      */
-    bool saveBeta(const std::string &inputFile, const std::string &outputFile, double energyLossScale = 2);
+    bool saveBeta(const std::string &inputFile,
+                  const std::string &outputFile,
+                  double energyLossScale = 2,
+                  EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All);
 
     /**
      * @brief Save magnetic field information to ROOT file
@@ -68,7 +71,9 @@ namespace Util
      * @param outputFile Path to save the ROOT file containing energy loss scale factor
      * @return bool True if calculation succeeds, false otherwise
      */
-    bool saveEnergyLossScale(const std::string &inputFile, const std::string &outputFile);
+    bool saveEnergyLossScale(const std::string &inputFile,
+                             const std::string &outputFile,
+                             EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All);
 
     /**
      * @brief Benchmark BetaNL::Beta() function average CPU time
@@ -78,9 +83,15 @@ namespace Util
      * @param energyLossScale Energy loss scale factor
      * @return bool True if benchmark succeeds, false otherwise
      */
-    bool benchmarkBetaNL(const std::string &inputFile, const std::string &outputFile, double energyLossScale = 2);
+    bool benchmarkBetaNL(const std::string &inputFile,
+                         const std::string &outputFile,
+                         double energyLossScale = 2,
+                         EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All);
 
-    bool saveBetaDiff(const std::string &inputFile, const std::string &outputFile, double energyLossScale = 2);
+    bool saveBetaDiff(const std::string &inputFile,
+                      const std::string &outputFile,
+                      double energyLossScale = 2,
+                      EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All);
 
     void test();
 }

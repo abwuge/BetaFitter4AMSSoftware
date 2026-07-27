@@ -158,7 +158,10 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     return particles;
 }
 
-bool Util::saveBeta(const std::string &inputFile, const std::string &outputFile, double energyLossScale)
+bool Util::saveBeta(const std::string &inputFile,
+                    const std::string &outputFile,
+                    double energyLossScale,
+                    EnergyLossScaleMode energyLossScaleMode)
 {
     // Load particle data from input file
     std::vector<ParticleData> particles = Util::loadParticleData(inputFile);
@@ -210,7 +213,8 @@ bool Util::saveBeta(const std::string &inputFile, const std::string &outputFile,
                     particle.TOF_hitTime,
                     particle.TOF_hitTimeError,
                     particle.TOF_length),
-                energyLossScale)
+                energyLossScale,
+                energyLossScaleMode)
                 .Beta();
         Z = particle.charge;
 
@@ -451,7 +455,9 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
     return true;
 }
 
-bool Util::saveEnergyLossScale(const std::string &inputFile, const std::string &outputFile)
+bool Util::saveEnergyLossScale(const std::string &inputFile,
+                               const std::string &outputFile,
+                               EnergyLossScaleMode energyLossScaleMode)
 {
     // Load particle data from input file
     std::vector<ParticleData> particles = Util::loadParticleData(inputFile);
@@ -499,7 +505,9 @@ bool Util::saveEnergyLossScale(const std::string &inputFile, const std::string &
                                   particle.TOF_hitEdep,
                                   particle.TOF_hitTime,
                                   particle.TOF_hitTimeError,
-                                  particle.TOF_length))
+                                  particle.TOF_length),
+                              2,
+                              energyLossScaleMode)
                               .EnergyLossScale(particle.mcBeta);
         mcBeta = particle.mcBeta;
         position[0] = particle.initCoo[0];
@@ -521,7 +529,10 @@ bool Util::saveEnergyLossScale(const std::string &inputFile, const std::string &
     return true;
 }
 
-bool Util::benchmarkBetaNL(const std::string &inputFile, const std::string &outputFile, double energyLossScale)
+bool Util::benchmarkBetaNL(const std::string &inputFile,
+                           const std::string &outputFile,
+                           double energyLossScale,
+                           EnergyLossScaleMode energyLossScaleMode)
 {
     // Load particle data from input file
     std::vector<ParticleData> particles = Util::loadParticleData(inputFile);
@@ -550,7 +561,8 @@ bool Util::benchmarkBetaNL(const std::string &inputFile, const std::string &outp
                     particle.TOF_hitTime,
                     particle.TOF_hitTimeError,
                     particle.TOF_length),
-                energyLossScale)
+                energyLossScale,
+                energyLossScaleMode)
                 .Beta();
 
         auto end = std::chrono::high_resolution_clock::now();
@@ -571,7 +583,10 @@ bool Util::benchmarkBetaNL(const std::string &inputFile, const std::string &outp
     return true;
 }
 
-bool Util::saveBetaDiff(const std::string &inputFile, const std::string &outputFile, double energyLossScale)
+bool Util::saveBetaDiff(const std::string &inputFile,
+                        const std::string &outputFile,
+                        double energyLossScale,
+                        EnergyLossScaleMode energyLossScaleMode)
 {
     TFile *fileIn = TFile::Open(inputFile.c_str(), "READ");
     if (!fileIn || fileIn->IsZombie())
@@ -653,7 +668,8 @@ bool Util::saveBetaDiff(const std::string &inputFile, const std::string &outputF
                     tof_tl,
                     tof_etl,
                     tof_leng),
-                energyLossScale)
+                energyLossScale,
+                energyLossScaleMode)
                 .Beta();
 
         for (int j = 0; j < 21; ++j)

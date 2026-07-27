@@ -1,4 +1,5 @@
 #include <iostream>
+#include <string>
 
 #include "Util.hh"
 
@@ -6,7 +7,7 @@ int main(int argc, char **argv)
 {
     if (argc < 3)
     {
-        std::cout << "Usage: " << argv[0] << " <inputFile.root> <outputFile.root> [<Option>] [<Energy Loss Scale>]" << std::endl;
+        std::cout << "Usage: " << argv[0] << " <inputFile.root> <outputFile.root> [<Option>] [<Energy Loss Scale>] [<Scale Mode: all|s2>]" << std::endl;
         std::cout << "Option: " << std::endl;
         std::cout << "  -2: Save energy loss information to ROOT file" << std::endl;
         std::cout << "  -1: Save magnetic field information to ROOT file" << std::endl;
@@ -21,8 +22,20 @@ int main(int argc, char **argv)
     std::string outputFile = argv[2];
     int Option = argc > 3 ? atoi(argv[3]) : 0;
     double energyLossScale = argc > 4 ? atof(argv[4]) : 2;
+    const std::string energyLossScaleModeName = argc > 5 ? argv[5] : "all";
+    EnergyLossScaleMode energyLossScaleMode;
+    if (energyLossScaleModeName == "all")
+        energyLossScaleMode = EnergyLossScaleMode::All;
+    else if (energyLossScaleModeName == "s2")
+        energyLossScaleMode = EnergyLossScaleMode::S2Only;
+    else
+    {
+        std::cerr << "Error: Scale mode must be 'all' or 's2'" << std::endl;
+        return 1;
+    }
 
-    std::string info = "\nInput file: " + inputFile + "\nOutput file: " + outputFile + "\nOption: " + std::to_string(Option) + "\n";
+    std::string info = "\nInput file: " + inputFile + "\nOutput file: " + outputFile + "\nOption: " + std::to_string(Option) +
+                       "\nEnergy Loss Scale Mode: " + energyLossScaleModeName + "\n";
 
     if (Option == 0)
         info += "Energy Loss Scale: " + std::to_string(energyLossScale) + "\n";
@@ -36,13 +49,13 @@ int main(int argc, char **argv)
     case -1:
         return Util::saveMagneticField(outputFile) ? 0 : 1;
     case 0:
-        return Util::saveBeta(inputFile, outputFile, energyLossScale) ? 0 : 1;
+        return Util::saveBeta(inputFile, outputFile, energyLossScale, energyLossScaleMode) ? 0 : 1;
     case 1:
-        return Util::saveEnergyLossScale(inputFile, outputFile) ? 0 : 1;
+        return Util::saveEnergyLossScale(inputFile, outputFile, energyLossScaleMode) ? 0 : 1;
     case 2:
-        return Util::benchmarkBetaNL(inputFile, outputFile, energyLossScale) ? 0 : 1;
+        return Util::benchmarkBetaNL(inputFile, outputFile, energyLossScale, energyLossScaleMode) ? 0 : 1;
     case 3:
-        return Util::saveBetaDiff(inputFile, outputFile, energyLossScale) ? 0 : 1;
+        return Util::saveBetaDiff(inputFile, outputFile, energyLossScale, energyLossScaleMode) ? 0 : 1;
     default:
         Util::test();
         return 1;

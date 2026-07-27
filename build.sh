@@ -45,4 +45,8 @@ echo "build Pass8..."
 echo
 export USEPASS7=1
 
-make $FLAG -j$(nproc)
+if [[ -n "$FLAG" ]]; then
+    make "$FLAG" -j$(nproc)
+else
+    make all -j$(nproc)
+fi

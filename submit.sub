@@ -1,6 +1,6 @@
 universe     = vanilla
 executable   = /home/ams/hxwu/AMSSoft/betaFitter/run.sh
-arguments    = $(inputfile) /home/ams/hxwu/AMSSoft/betaFitter/results/$(Cluster)_$(Process).root $(fitOption) $(energyLossScale)
+arguments    = $(inputfile) /home/ams/hxwu/AMSSoft/betaFitter/results/$(Cluster)_$(Process).root $(fitOption) $(energyLossScale) $(energyLossScaleMode)
 
 request_cpus = 1
 
