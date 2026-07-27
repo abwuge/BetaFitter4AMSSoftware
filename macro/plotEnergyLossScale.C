@@ -151,14 +151,14 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     }
 
     // Extract values for readability
-    double energyLossScaleMin = -6;
-    double energyLossScaleMax = 10;
+    double energyLossScaleMin = -2;
+    double energyLossScaleMax = 6;
     double mcBetaMin = tree->GetMinimum("mcBeta");
     double mcBetaMax = tree->GetMaximum("mcBeta");
     const double mcBetaSelectionMax = 0.9;
 
     // Number of bins for histograms
-    int nBins = 100;
+    int nBins = 200;
     int nBinsX = 40;   // Number of bins in beta direction
     int nBinsY = 100; // Number of bins in scale direction
 
@@ -204,8 +204,6 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     canvas1->SetRightMargin(0.11);
     canvas1->SetGridx();
     canvas1->SetGridy();
-    canvas1->SetLogy();
-
     tree->Draw("energyLossScale>>hEnergyLossScale", Form("mcBeta < %.1f", mcBetaSelectionMax));
     hEnergyLossScale->SetLineColor(kBlue);
     hEnergyLossScale->SetLineWidth(2);
@@ -226,9 +224,10 @@ void plotEnergyLossScale(std::string fileName = "test.root",
 
     TLegend *legend = new TLegend(0.62, 0.67, 0.87, 0.87);
     legend->SetBorderSize(kNone);
-    legend->AddEntry("", Form("#mu = %.4g", hEnergyLossScale->GetMean()), "");
-    legend->AddEntry("", Form("#sigma = %.4g", hEnergyLossScale->GetRMS()), "");
-    legend->AddEntry("", Form("Entries: %d", (int)hEnergyLossScale->GetEntries()), "");
+    legend->AddEntry("", Form("Mean (in range) = %.4g", hEnergyLossScale->GetMean()), "");
+    legend->AddEntry("", Form("RMS (in range) = %.4g", hEnergyLossScale->GetRMS()), "");
+    legend->AddEntry("", Form("Entries in range: %.0f",
+                              hEnergyLossScale->Integral(1, hEnergyLossScale->GetNbinsX())), "");
     legend->Draw();
 
     canvas1->Print(Form("%s(", outputName));
