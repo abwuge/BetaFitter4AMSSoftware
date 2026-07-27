@@ -78,6 +78,18 @@
 ./run_local.sh 2 0 1.9 100 all center
 ```
 
+### 全局 zeta 拟合
+
+选项 `4` 在所有选中的 MC 事件上拟合一个共享的能损缩放因子。每个事件的公共时间零点会被解析消去，不会先逐事件拟合 zeta 再求平均。输入既可以是单个 ROOT 文件，也可以是每行一个 ROOT 路径的 `.list` 文件：
+
+```bash
+./run.sh input_Z2.list global_zeta_Z2.root 4 0.9 all center 0 6
+```
+
+其中 `0.9` 是 MC beta 上限，最后两个参数是 zeta 搜索范围。拟合在同一批 checkpoint 可积分事件上同时给出 measured-time 和 checkpoint-truth 两个结果。输出包含单条目的 `globalScaleTree` 和 41 点的 `globalScaleProfile`。中心模式与普通 beta 重建使用相同的参考点传播定义。
+
+该入口将 [`research/zeta_study_20260722`](research/zeta_study_20260722/README.md) 的全局 profile 方法纳入主程序，并扩展到可选的 AMS 中心参考点。
+
 三种作用范围的物理解释、Z2/Z6/Z8 验证结果和使用建议见
 [zeta 作用范围验证结论](docs/energy-loss-scale-scope.md)。
 

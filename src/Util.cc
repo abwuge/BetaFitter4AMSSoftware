@@ -1,7 +1,16 @@
 #include "Util.hh"
+#include "GlobalZetaFitter.hh"
 #include "amschain.h"
 #include "ParticlePropagator.hh"
 #include <fstream>
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <limits>
+#include <string>
+#include <utility>
+#include <vector>
+#include <TChain.h>
 #include <TFile.h>
 #include <TTree.h>
 #include <TPolyMarker3D.h>
@@ -10,6 +19,138 @@
 #include <TView.h>
 #include <TText.h>
 #include <chrono>
+
+namespace
+{
+bool addGlobalZetaInput(TChain &chain, const std::string &inputPath, int &filesAdded)
+{
+    filesAdded = 0;
+    const bool isList = inputPath.size() >= 5 &&
+                        inputPath.substr(inputPath.size() - 5) == ".list";
+    if (!isList)
+    {
+        filesAdded = chain.Add(inputPath.c_str());
+        return filesAdded > 0;
+    }
+
+    std::ifstream input(inputPath.c_str());
+    if (!input)
+        return false;
+    std::string path;
+    while (std::getline(input, path))
+    {
+        const std::string::size_type first = path.find_first_not_of(" \t\r");
+        if (first == std::string::npos || path[first] == '#')
+            continue;
+        const std::string::size_type last = path.find_last_not_of(" \t\r");
+        filesAdded += chain.Add(path.substr(first, last - first + 1).c_str());
+    }
+    return filesAdded > 0;
+}
+
+struct MomentumPoint
+{
+    double z;
+    double momentum;
+};
+
+double momentumAt(const std::vector<MomentumPoint> &points, double z)
+{
+    if (points.empty() || z > points.front().z || z < points.back().z)
+        return std::numeric_limits<double>::quiet_NaN();
+    for (size_t index = 0; index + 1 < points.size(); ++index)
+    {
+        if (points[index].z + 1e-9 < z || z < points[index + 1].z - 1e-9)
+            continue;
+        const double deltaZ = points[index].z - points[index + 1].z;
+        if (std::abs(deltaZ) < 1e-10)
+            return 0.5 * (points[index].momentum + points[index + 1].momentum);
+        const double fraction = (points[index].z - z) / deltaZ;
+        return points[index].momentum * (1 - fraction) +
+               points[index + 1].momentum * fraction;
+    }
+    return std::numeric_limits<double>::quiet_NaN();
+}
+
+double averageInverseBeta(const std::vector<MomentumPoint> &points,
+                          double zFirst, double zSecond, double mass)
+{
+    if (zFirst < zSecond)
+        std::swap(zFirst, zSecond);
+    if (points.empty() || zFirst > points.front().z || zSecond < points.back().z ||
+        !(zFirst > zSecond))
+        return std::numeric_limits<double>::quiet_NaN();
+
+    std::vector<double> positions;
+    positions.push_back(zFirst);
+    positions.push_back(zSecond);
+    for (const MomentumPoint &point : points)
+        if (point.z < zFirst && point.z > zSecond)
+            positions.push_back(point.z);
+    std::sort(positions.begin(), positions.end(), std::greater<double>());
+    positions.erase(std::unique(positions.begin(), positions.end(),
+                                [](double left, double right)
+                                { return std::abs(left - right) < 1e-6; }),
+                    positions.end());
+
+    const auto inverseBeta = [mass](double momentum)
+    {
+        return std::sqrt(1.0 + (mass / momentum) * (mass / momentum));
+    };
+    double integral = 0;
+    for (size_t index = 0; index + 1 < positions.size(); ++index)
+    {
+        const double first = positions[index];
+        const double second = positions[index + 1];
+        const double middle = 0.5 * (first + second);
+        const double momentumFirst = momentumAt(points, first);
+        const double momentumSecond = momentumAt(points, second);
+        const double momentumMiddle = momentumAt(points, middle);
+        if (!(momentumFirst > 0) || !(momentumSecond > 0) || !(momentumMiddle > 0))
+            return std::numeric_limits<double>::quiet_NaN();
+        integral += (first - second) *
+                    (inverseBeta(momentumFirst) + 4 * inverseBeta(momentumMiddle) +
+                     inverseBeta(momentumSecond)) /
+                    6.0;
+    }
+    return integral / (zFirst - zSecond);
+}
+
+bool buildCheckpointTruthTimes(const float momentum[21], const float coordinate[21][3],
+                               const float tofPosition[4][3], const std::array<float, 4> &pathLength,
+                               double mass, std::array<float, 4> &truthTime)
+{
+    std::vector<MomentumPoint> points;
+    for (int index = 0; index < 21; ++index)
+        if (momentum[index] > 0 && std::isfinite(momentum[index]) &&
+            std::isfinite(coordinate[index][2]))
+            points.push_back(MomentumPoint{coordinate[index][2], momentum[index]});
+    std::sort(points.begin(), points.end(),
+              [](const MomentumPoint &left, const MomentumPoint &right)
+              { return left.z > right.z; });
+    std::vector<MomentumPoint> uniquePoints;
+    for (const MomentumPoint &point : points)
+    {
+        if (uniquePoints.empty() || std::abs(point.z - uniquePoints.back().z) > 1e-5)
+            uniquePoints.push_back(point);
+        else
+            uniquePoints.back().momentum = 0.5 * (uniquePoints.back().momentum + point.momentum);
+    }
+
+    truthTime.fill(0);
+    for (int station = 1; station < 4; ++station)
+    {
+        const double inverseBeta = averageInverseBeta(
+            uniquePoints, tofPosition[station - 1][2], tofPosition[station][2], mass);
+        const double segmentLength = pathLength[station] - pathLength[station - 1];
+        if (!std::isfinite(inverseBeta) || !(segmentLength > 0 && segmentLength < 300))
+            return false;
+        truthTime[station] = static_cast<float>(truthTime[station - 1] +
+                                                segmentLength / 29.9792458 * inverseBeta);
+    }
+    return true;
+}
+}
 
 // Implementation of getMass function
 float Util::getMass(int pdgId, double charge)
@@ -531,6 +672,225 @@ bool Util::saveEnergyLossScale(const std::string &inputFile,
     outFile->Close();
     delete outFile;
 
+    return true;
+}
+
+bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
+                                     const std::string &outputFile,
+                                     double betaMax,
+                                     double zetaMin,
+                                     double zetaMax,
+                                     EnergyLossScaleMode energyLossScaleMode,
+                                     BetaReferencePoint referencePoint)
+{
+    if (!(betaMax > 0.1 && betaMax < 1.0))
+    {
+        std::cerr << "Error: Global fit beta maximum must be between 0.1 and 1" << std::endl;
+        return false;
+    }
+    if (!(zetaMin < zetaMax))
+    {
+        std::cerr << "Error: Global fit zeta minimum must be below maximum" << std::endl;
+        return false;
+    }
+
+    TChain chain("amstreea");
+    int filesAdded = 0;
+    if (!addGlobalZetaInput(chain, inputFile, filesAdded) || chain.GetEntries() <= 0)
+    {
+        std::cerr << "Error: Could not load global-fit input " << inputFile << std::endl;
+        return false;
+    }
+    chain.LoadTree(0);
+    const char *requiredBranches[] = {
+        "mpar", "mch", "mevmom1", "mevcoo1", "tof_tl", "tof_edep",
+        "tof_leng", "tof_pos"};
+    for (const char *branch : requiredBranches)
+        if (!chain.GetBranch(branch))
+        {
+            std::cerr << "Error: Missing MC branch " << branch << std::endl;
+            return false;
+        }
+
+    int mpar = 0;
+    float mch = 0;
+    float mevmom1[21] = {};
+    float mevcoo1[21][3] = {};
+    float tofTime[4] = {};
+    float tofEnergyDeposited[4] = {};
+    float tofLength[4] = {};
+    float tofPosition[4][3] = {};
+    chain.SetBranchStatus("*", 0);
+    for (const char *branch : requiredBranches)
+        chain.SetBranchStatus(branch, 1);
+    chain.SetBranchAddress("mpar", &mpar);
+    chain.SetBranchAddress("mch", &mch);
+    chain.SetBranchAddress("mevmom1", mevmom1);
+    chain.SetBranchAddress("mevcoo1", mevcoo1);
+    chain.SetBranchAddress("tof_tl", tofTime);
+    chain.SetBranchAddress("tof_edep", tofEnergyDeposited);
+    chain.SetBranchAddress("tof_leng", tofLength);
+    chain.SetBranchAddress("tof_pos", tofPosition);
+
+    const Long64_t inputEntries = chain.GetEntries();
+    Long64_t validFourHitEntries = 0;
+    Long64_t betaSelectedEntries = 0;
+    Long64_t truthIntegrableEntries = 0;
+    std::vector<GlobalZetaEvent> stableEvents;
+    stableEvents.reserve(std::max<Long64_t>(10000, inputEntries / 4));
+    const std::vector<GlobalZetaEvent> emptyEvents;
+    GlobalZetaFitter validator(emptyEvents, energyLossScaleMode, referencePoint);
+    int fittedCharge = 0;
+    bool mixedCharge = false;
+    const int mcReferenceIndex = referencePoint == BetaReferencePoint::AMSCenter ? 10 : 4;
+    for (Long64_t entry = 0; entry < inputEntries; ++entry)
+    {
+        chain.GetEntry(entry);
+        const double mass = getMass(mpar, mch);
+        const double momentum = mevmom1[mcReferenceIndex];
+        if (!(mass > 0) || !(momentum > 0) || !std::isfinite(momentum))
+            continue;
+
+        GlobalZetaEvent event;
+        bool valid = true;
+        for (int station = 0; station < 4; ++station)
+        {
+            if (tofTime[station] == -1 || !std::isfinite(tofTime[station]) ||
+                !(tofEnergyDeposited[station] > 0) || !std::isfinite(tofEnergyDeposited[station]) ||
+                !std::isfinite(tofLength[station]))
+            {
+                valid = false;
+                break;
+            }
+            event.hitTime[station] = tofTime[station];
+            event.energyDeposited[station] = tofEnergyDeposited[station] * 1e-3;
+            event.pathLength[station] = tofLength[station];
+        }
+        if (!valid)
+            continue;
+        ++validFourHitEntries;
+
+        event.mass = mass;
+        event.mcBeta = momentum / std::sqrt(momentum * momentum + mass * mass);
+        if (!(event.mcBeta > 0.2 && event.mcBeta < betaMax))
+            continue;
+        ++betaSelectedEntries;
+
+        if (!buildCheckpointTruthTimes(mevmom1, mevcoo1, tofPosition,
+                                       event.pathLength, mass, event.checkpointTruthTime))
+            continue;
+        ++truthIntegrableEntries;
+        if (validator.IsValidAt(event, zetaMin) && validator.IsValidAt(event, zetaMax))
+            stableEvents.push_back(event);
+
+        const int charge = static_cast<int>(mch + 0.5);
+        if (fittedCharge == 0)
+            fittedCharge = charge;
+        else if (charge != fittedCharge)
+            mixedCharge = true;
+    }
+
+    chain.Reset();
+
+    GlobalZetaFitter measuredFitter(stableEvents, energyLossScaleMode, referencePoint,
+                                    GlobalZetaTarget::MeasuredTime);
+    GlobalZetaFitter truthFitter(stableEvents, energyLossScaleMode, referencePoint,
+                                 GlobalZetaTarget::CheckpointTruth);
+    const GlobalZetaResult measuredResult = measuredFitter.Fit(zetaMin, zetaMax);
+    const GlobalZetaResult truthResult = truthFitter.Fit(zetaMin, zetaMax);
+    if (!measuredResult.valid || !truthResult.valid)
+    {
+        std::cerr << "Error: Global energy-loss scale fit failed" << std::endl;
+        return false;
+    }
+
+    TFile output(outputFile.c_str(), "RECREATE");
+    if (output.IsZombie())
+    {
+        std::cerr << "Error: Could not create output file " << outputFile << std::endl;
+        return false;
+    }
+
+    double fittedZeta = measuredResult.zeta;
+    double fittedZetaMeasured = measuredResult.zeta;
+    double fittedZetaTruth = truthResult.zeta;
+    double chi2 = measuredResult.chi2;
+    double chi2PerEvent = measuredResult.chi2PerEvent;
+    double chi2Truth = truthResult.chi2;
+    double chi2TruthPerEvent = truthResult.chi2PerEvent;
+    double storedBetaMax = betaMax;
+    double storedZetaMin = zetaMin;
+    double storedZetaMax = zetaMax;
+    Long64_t storedInputEntries = inputEntries;
+    Long64_t storedFourHitEntries = validFourHitEntries;
+    Long64_t storedBetaSelectedEntries = betaSelectedEntries;
+    Long64_t storedTruthIntegrableEntries = truthIntegrableEntries;
+    Long64_t storedStableEntries = measuredResult.entries;
+    int storedFilesAdded = filesAdded;
+    int storedCharge = mixedCharge ? -1 : fittedCharge;
+    int storedScaleMode = static_cast<int>(energyLossScaleMode);
+    int storedReferencePoint = static_cast<int>(referencePoint);
+    const double boundaryTolerance = (zetaMax - zetaMin) / 40.0;
+    int atBoundary = fittedZeta <= zetaMin + boundaryTolerance ||
+                     fittedZeta >= zetaMax - boundaryTolerance;
+    int truthAtBoundary = fittedZetaTruth <= zetaMin + boundaryTolerance ||
+                          fittedZetaTruth >= zetaMax - boundaryTolerance;
+
+    TTree summary("globalScaleTree", "Global Energy Loss Scale Fit");
+    summary.Branch("energyLossScale", &fittedZeta, "energyLossScale/D");
+    summary.Branch("energyLossScaleMeasured", &fittedZetaMeasured, "energyLossScaleMeasured/D");
+    summary.Branch("energyLossScaleTruth", &fittedZetaTruth, "energyLossScaleTruth/D");
+    summary.Branch("chi2", &chi2, "chi2/D");
+    summary.Branch("chi2PerEvent", &chi2PerEvent, "chi2PerEvent/D");
+    summary.Branch("chi2Truth", &chi2Truth, "chi2Truth/D");
+    summary.Branch("chi2TruthPerEvent", &chi2TruthPerEvent, "chi2TruthPerEvent/D");
+    summary.Branch("betaMax", &storedBetaMax, "betaMax/D");
+    summary.Branch("zetaMin", &storedZetaMin, "zetaMin/D");
+    summary.Branch("zetaMax", &storedZetaMax, "zetaMax/D");
+    summary.Branch("inputEntries", &storedInputEntries, "inputEntries/L");
+    summary.Branch("fourHitEntries", &storedFourHitEntries, "fourHitEntries/L");
+    summary.Branch("betaSelectedEntries", &storedBetaSelectedEntries, "betaSelectedEntries/L");
+    summary.Branch("truthIntegrableEntries", &storedTruthIntegrableEntries, "truthIntegrableEntries/L");
+    summary.Branch("stableEntries", &storedStableEntries, "stableEntries/L");
+    summary.Branch("filesAdded", &storedFilesAdded, "filesAdded/I");
+    summary.Branch("charge", &storedCharge, "charge/I");
+    summary.Branch("energyLossScaleMode", &storedScaleMode, "energyLossScaleMode/I");
+    summary.Branch("referencePoint", &storedReferencePoint, "referencePoint/I");
+    summary.Branch("atBoundary", &atBoundary, "atBoundary/I");
+    summary.Branch("truthAtBoundary", &truthAtBoundary, "truthAtBoundary/I");
+    summary.Fill();
+    summary.Write();
+
+    TTree profile("globalScaleProfile", "Global Energy Loss Scale Profile");
+    double profileZeta = 0;
+    double profileChi2 = 0;
+    double deltaChi2 = 0;
+    double profileChi2Truth = 0;
+    double deltaChi2Truth = 0;
+    profile.Branch("energyLossScale", &profileZeta, "energyLossScale/D");
+    profile.Branch("chi2", &profileChi2, "chi2/D");
+    profile.Branch("deltaChi2", &deltaChi2, "deltaChi2/D");
+    profile.Branch("chi2Truth", &profileChi2Truth, "chi2Truth/D");
+    profile.Branch("deltaChi2Truth", &deltaChi2Truth, "deltaChi2Truth/D");
+    const int profilePoints = 41;
+    for (int point = 0; point < profilePoints; ++point)
+    {
+        profileZeta = zetaMin + (zetaMax - zetaMin) * point / (profilePoints - 1);
+        profileChi2 = measuredFitter.Chi2(profileZeta);
+        deltaChi2 = profileChi2 - measuredResult.chi2;
+        profileChi2Truth = truthFitter.Chi2(profileZeta);
+        deltaChi2Truth = profileChi2Truth - truthResult.chi2;
+        profile.Fill();
+    }
+    profile.Write();
+    output.Close();
+
+    std::cout << "Global measured-time zeta fit: " << fittedZetaMeasured
+              << ", checkpoint-truth zeta fit: " << fittedZetaTruth
+              << ", measured chi2/event: " << chi2PerEvent
+              << ", stable entries: " << storedStableEntries
+              << ", beta-selected entries: " << storedBetaSelectedEntries
+              << std::endl;
     return true;
 }
 

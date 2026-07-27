@@ -71,6 +71,18 @@ point immediately before the particle enters TOF:
 ./run.sh input.root output.root 0 1.9 all before_tof
 ```
 
+### Global zeta fit
+
+Option `4` fits one energy-loss scale shared by all selected MC events. Each event's common time offset is profiled out analytically; the implementation does not fit one zeta per event and then average the estimates. The input may be one ROOT file or a `.list` file containing one ROOT path per line:
+
+```bash
+./run.sh input_Z2.list global_zeta_Z2.root 4 0.9 all center 0 6
+```
+
+Here `0.9` is the MC beta upper limit and the final two arguments define the zeta search range. The fit reports measured-time and checkpoint-truth results on the same checkpoint-integrable event sample. The output contains a one-entry `globalScaleTree` and a 41-point `globalScaleProfile`. Center mode uses the same reference-point propagation definition as normal beta reconstruction.
+
+This entry point promotes the global-profile method from [`research/zeta_study_20260722`](research/zeta_study_20260722/README.md) into the main program and extends it to the selectable AMS-center reference point.
+
 ## Data Analysis
 
 The project provides various data analysis and visualization tools:

@@ -80,6 +80,20 @@ namespace Util
                              BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter);
 
     /**
+     * @brief Fit one energy-loss scale shared by all selected MC events
+     *
+     * The input may be one ROOT file or a text file containing one ROOT path per line.
+     * Each event's common time offset is profiled out analytically.
+     */
+    bool saveGlobalEnergyLossScale(const std::string &inputFile,
+                                   const std::string &outputFile,
+                                   double betaMax = 0.9,
+                                   double zetaMin = 0.0,
+                                   double zetaMax = 6.0,
+                                   EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All,
+                                   BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter);
+
+    /**
      * @brief Benchmark BetaNL::Beta() function average CPU time
      * 
      * @param inputFile Path to the ROOT file containing particle data
