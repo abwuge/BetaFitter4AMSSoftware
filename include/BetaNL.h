@@ -8,6 +8,7 @@
 enum class EnergyLossScaleMode
 {
     All,
+    S1S2,
     S2Only
 };
 

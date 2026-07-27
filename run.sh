@@ -5,7 +5,7 @@ source /home/ams/hxwu/AMSSoft/AMSVX_TOFBetaFit_el9/amsroot_TOFBetaFit.sh
 
 if [[ $# -lt 2 ]]; then
     echo "Error: Need at least 2 parameters"
-    echo "Usage: $0 inputFile outputFile [fitOption=0] [energyLossScale=1.0] [energyLossScaleMode=all]"
+    echo "Usage: $0 inputFile outputFile [fitOption=0] [energyLossScale=1.0] [energyLossScaleMode=all|s1s2|s2]"
     exit 1
 fi
 

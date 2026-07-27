@@ -7,7 +7,7 @@ int main(int argc, char **argv)
 {
     if (argc < 3)
     {
-        std::cout << "Usage: " << argv[0] << " <inputFile.root> <outputFile.root> [<Option>] [<Energy Loss Scale>] [<Scale Mode: all|s2>]" << std::endl;
+        std::cout << "Usage: " << argv[0] << " <inputFile.root> <outputFile.root> [<Option>] [<Energy Loss Scale>] [<Scale Mode: all|s1s2|s2>]" << std::endl;
         std::cout << "Option: " << std::endl;
         std::cout << "  -2: Save energy loss information to ROOT file" << std::endl;
         std::cout << "  -1: Save magnetic field information to ROOT file" << std::endl;
@@ -26,11 +26,13 @@ int main(int argc, char **argv)
     EnergyLossScaleMode energyLossScaleMode;
     if (energyLossScaleModeName == "all")
         energyLossScaleMode = EnergyLossScaleMode::All;
+    else if (energyLossScaleModeName == "s1s2")
+        energyLossScaleMode = EnergyLossScaleMode::S1S2;
     else if (energyLossScaleModeName == "s2")
         energyLossScaleMode = EnergyLossScaleMode::S2Only;
     else
     {
-        std::cerr << "Error: Scale mode must be 'all' or 's2'" << std::endl;
+        std::cerr << "Error: Scale mode must be 'all', 's1s2', or 's2'" << std::endl;
         return 1;
     }
 

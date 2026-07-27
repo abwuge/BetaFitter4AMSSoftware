@@ -131,7 +131,9 @@ std::vector<double> BetaNL::propagate(double beta) const
     for (int i = 1; i < BetaNLPars::nTOF; ++i)
     {
         const int station = i - 1;
-        const bool applyScale = _energyLossScaleMode == EnergyLossScaleMode::All || station == 1;
+        const bool applyScale = _energyLossScaleMode == EnergyLossScaleMode::All ||
+                                (_energyLossScaleMode == EnergyLossScaleMode::S1S2 && station < 2) ||
+                                (_energyLossScaleMode == EnergyLossScaleMode::S2Only && station == 1);
         energy -= deps[station] * (applyScale ? _energyLossScale : 1.0);
         const double inv_beta = 1.0 / std::sqrt(1.0 - massSquared / (energy * energy));
         hitTimes[i] = hitTimes[i - 1] + paths[i] * inv_c * inv_beta;

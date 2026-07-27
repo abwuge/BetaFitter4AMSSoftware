@@ -101,7 +101,8 @@ void validateZetaScope(
     const char *betaS2Path = "results/validation_zeta_scope/beta_s2.root",
     const char *zetaAllPath = "results/validation_zeta_scope/zeta_all.root",
     const char *zetaS2Path = "results/validation_zeta_scope/zeta_s2.root",
-    const char *outputDirectory = "results/validation_zeta_scope")
+    const char *outputDirectory = "results/validation_zeta_scope",
+    const char *alternativeLabel = "#zeta on S2 only")
 {
     gROOT->SetBatch(true);
     gROOT->SetStyle("Pub");
@@ -294,10 +295,10 @@ void validateZetaScope(
 
     TH1D hResidualAll("hResidualAll", ";1/#beta_{reco} - 1/#beta_{MC};normalized entries", 100, residualLow, residualHigh);
     TH1D hResidualS2("hResidualS2", ";1/#beta_{reco} - 1/#beta_{MC};normalized entries", 100, residualLow, residualHigh);
-    TH1D hBetaDifference("hBetaDifference", ";1/#beta_{S2} - 1/#beta_{all};entries", 100, betaDifferenceLow, betaDifferenceHigh);
+    TH1D hBetaDifference("hBetaDifference", ";1/#beta_{alternative} - 1/#beta_{all};entries", 100, betaDifferenceLow, betaDifferenceHigh);
     TH1D hZetaAll("hZetaAll", ";fitted #zeta (#beta_{MC} < 0.9);normalized entries", 100, zetaLow, zetaHigh);
     TH1D hZetaS2("hZetaS2", ";fitted #zeta (#beta_{MC} < 0.9);normalized entries", 100, zetaLow, zetaHigh);
-    TH2D hZetaCorrelation("hZetaCorrelation", ";#zeta_{all};#zeta_{S2}", 80, zetaLow, zetaHigh, 80, zetaLow, zetaHigh);
+    TH2D hZetaCorrelation("hZetaCorrelation", ";#zeta_{all};#zeta_{alternative}", 80, zetaLow, zetaHigh, 80, zetaLow, zetaHigh);
     for (size_t i = 0; i < residualAll.size(); ++i)
     {
         hResidualAll.Fill(residualAll[i]);
@@ -331,7 +332,7 @@ void validateZetaScope(
     TLegend residualLegend(0.62, 0.72, 0.88, 0.88);
     residualLegend.SetBorderSize(0);
     residualLegend.AddEntry(&hResidualAll, "#zeta on S1-S3", "l");
-    residualLegend.AddEntry(&hResidualS2, "#zeta on S2 only", "l");
+    residualLegend.AddEntry(&hResidualS2, alternativeLabel, "l");
     residualLegend.Draw();
     canvas.cd(2);
     gPad->SetLogy();
@@ -342,7 +343,7 @@ void validateZetaScope(
     TLegend zetaLegend(0.62, 0.72, 0.88, 0.88);
     zetaLegend.SetBorderSize(0);
     zetaLegend.AddEntry(&hZetaAll, "#zeta on S1-S3", "l");
-    zetaLegend.AddEntry(&hZetaS2, "#zeta on S2 only", "l");
+    zetaLegend.AddEntry(&hZetaS2, alternativeLabel, "l");
     zetaLegend.Draw();
     canvas.cd(4);
     gPad->SetRightMargin(0.16);
