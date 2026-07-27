@@ -33,7 +33,9 @@ namespace Util
      * @param inputFile Path to the ROOT file containing particle data
      * @return std::vector<ParticleData> Vector of particle data, empty if loading fails
      */
-    std::vector<ParticleData> loadParticleData(const std::string &inputFile);
+    std::vector<ParticleData> loadParticleData(
+        const std::string &inputFile,
+        BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter);
 
     /**
      * @brief Save beta reconstruction results to ROOT file
@@ -45,7 +47,8 @@ namespace Util
     bool saveBeta(const std::string &inputFile,
                   const std::string &outputFile,
                   double energyLossScale = 2,
-                  EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All);
+                  EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All,
+                  BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter);
 
     /**
      * @brief Save magnetic field information to ROOT file
@@ -73,7 +76,8 @@ namespace Util
      */
     bool saveEnergyLossScale(const std::string &inputFile,
                              const std::string &outputFile,
-                             EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All);
+                             EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All,
+                             BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter);
 
     /**
      * @brief Benchmark BetaNL::Beta() function average CPU time
@@ -86,12 +90,14 @@ namespace Util
     bool benchmarkBetaNL(const std::string &inputFile,
                          const std::string &outputFile,
                          double energyLossScale = 2,
-                         EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All);
+                         EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All,
+                         BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter);
 
     bool saveBetaDiff(const std::string &inputFile,
                       const std::string &outputFile,
                       double energyLossScale = 2,
-                      EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All);
+                      EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All,
+                      BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter);
 
     void test();
 }

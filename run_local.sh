@@ -6,6 +6,7 @@ fitOption=${2:-0}
 energyLossScale=${3:-1.0}
 MAX_PROCS=${4:-100}
 energyLossScaleMode=${5:-all}
+referencePoint=${6:-center}
 
 # Array to store child PIDs
 declare -a CHILD_PIDS
@@ -68,7 +69,7 @@ while IFS= read -r input_file; do
     ((counter++))
     
     # Run the process in background
-    ("${SCRIPT_DIR}/run.sh" "$input_file" "$output_file" "$fitOption" "$energyLossScale" "$energyLossScaleMode" > "$log_file" 2>&1) &
+    ("${SCRIPT_DIR}/run.sh" "$input_file" "$output_file" "$fitOption" "$energyLossScale" "$energyLossScaleMode" "$referencePoint" > "$log_file" 2>&1) &
     
     # Store the PID of the background process
     CHILD_PIDS+=($!)
@@ -98,7 +99,7 @@ if [ ! -f "$README_FILE" ]; then
 fi
 
 # Append run information to README.md
-echo "[${TIMESTAMP}] FILE = ${HADD_FILE}: Z = ${Z}, fitOption = ${fitOption}, energyLossScale = ${energyLossScale}, energyLossScaleMode = ${energyLossScaleMode}, MAX_PROCS = ${MAX_PROCS}  " >> "$README_FILE"
+echo "[${TIMESTAMP}] FILE = ${HADD_FILE}: Z = ${Z}, fitOption = ${fitOption}, energyLossScale = ${energyLossScale}, energyLossScaleMode = ${energyLossScaleMode}, referencePoint = ${referencePoint}, MAX_PROCS = ${MAX_PROCS}  " >> "$README_FILE"
 echo "Run information has been added to ${README_FILE}."
 
 echo "All jobs completed!"

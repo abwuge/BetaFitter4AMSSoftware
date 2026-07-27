@@ -12,6 +12,12 @@ enum class EnergyLossScaleMode
     S2Only
 };
 
+enum class BetaReferencePoint
+{
+    AMSCenter,
+    BeforeTOF
+};
+
 /**
  * @class BetaNLPars
  * @brief Parameters for the beta non-linear reconstruction
@@ -170,13 +176,18 @@ public:
     /**
      * Constructor with BetaNLPars
      * @param pars Parameters for the beta non-linear reconstruction
+     * @param energyLossScale Scale factor applied to selected TOF energy losses
+     * @param energyLossScaleMode TOF stations whose energy losses are scaled
+     * @param referencePoint Point at which the fitted beta is defined
      */
     BetaNL(BetaNLPars pars,
            double energyLossScale = 2,
-           EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All)
+           EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All,
+           BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter)
         : _pars(std::make_shared<BetaNLPars>(pars)),
           _energyLossScale(energyLossScale),
-          _energyLossScaleMode(energyLossScaleMode) {};
+          _energyLossScaleMode(energyLossScaleMode),
+          _referencePoint(referencePoint) {};
 
     /**
      * Destructor
@@ -222,6 +233,7 @@ private:
     std::shared_ptr<double> _invBeta = nullptr; // Reconstructed 1/beta value
     double _energyLossScale = 2;                // Energy loss scale factor
     EnergyLossScaleMode _energyLossScaleMode = EnergyLossScaleMode::All;
+    BetaReferencePoint _referencePoint = BetaReferencePoint::AMSCenter;
     double _timeOffset = 0;                     // Reconstructed time offset in ns
 };
 

@@ -62,12 +62,20 @@
 ./run_local.sh
 ```
 
-能损缩放范围可通过最后一个参数在当前的全部前三层（`all`，默认）、S1 和 S2（`s1s2`）以及仅 S2（`s2`）之间切换：
+能损缩放范围可通过第五个参数在当前的全部前三层（`all`，默认）、S1 和 S2（`s1s2`）以及仅 S2（`s2`）之间切换：
 
 ```bash
 ./run.sh input.root output.root 0 1.9 s1s2
 ./run.sh input.root output.root 0 1.9 s2
 ./run_local.sh 2 0 1.9 100 s2
+```
+
+重建参考点通过其后的参数选择：`center` 表示 AMS 中心（S2 与 S3 之间，默认），`before_tof` 表示粒子进入 TOF 之前：
+
+```bash
+./run.sh input.root output.root 0 1.9 all center
+./run.sh input.root output.root 0 1.9 all before_tof
+./run_local.sh 2 0 1.9 100 all center
 ```
 
 三种作用范围的物理解释、Z2/Z6/Z8 验证结果和使用建议见

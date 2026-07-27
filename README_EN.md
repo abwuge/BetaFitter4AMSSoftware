@@ -62,6 +62,15 @@ Or use the local processing script:
 ./run_local.sh
 ```
 
+The final argument selects the beta reconstruction reference point: `center`
+means the AMS center between S2 and S3 (default), while `before_tof` means the
+point immediately before the particle enters TOF:
+
+```bash
+./run.sh input.root output.root 0 1.9 all center
+./run.sh input.root output.root 0 1.9 all before_tof
+```
+
 ## Data Analysis
 
 The project provides various data analysis and visualization tools:

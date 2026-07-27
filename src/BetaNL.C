@@ -57,11 +57,6 @@ void BetaNLPars::init()
 {
     for (auto &edep : _energyDeposited)
         edep *= 1e-3;
-
-    for (int i = 3; i > 0; --i)
-        _pathLength[i] = _pathLength[i] - _pathLength[i - 1];
-
-    _pathLength[0] = 0;
 }
 
 double BetaNL::EnergyLossScale(double mcBeta)
@@ -81,7 +76,9 @@ double BetaNL::EnergyLossScale(double mcBeta)
     minimizer->SetLimitedVariable(0, "scale", initialScale, 0.1 * scaleRange, lowerScale, upperScale);
 
     const double timeError = _pars->_hitTimeError[0];
-    const double initialTimeOffset = _pars->_hitTime[0];
+    const double initialTimeOffset = _referencePoint == BetaReferencePoint::AMSCenter
+                                         ? (_pars->_hitTime[0] + _pars->_hitTime[3]) / 2
+                                         : _pars->_hitTime[0];
     const double lowerTimeOffset = initialTimeOffset - 5 * timeError;
     const double upperTimeOffset = initialTimeOffset + 5 * timeError;
     minimizer->SetLimitedVariable(1, "timeOffset", initialTimeOffset, 0.1 * timeError, lowerTimeOffset, upperTimeOffset);
@@ -112,10 +109,31 @@ std::vector<double> BetaNL::propagate(double beta) const
     constexpr double inv_c = 1.0 / BetaNLPars::SPEED_OF_LIGHT;
     std::vector<double> hitTimes(BetaNLPars::nTOF, 0.0);
 
-    const auto &paths = _pars->_pathLength;
+    auto paths = _pars->_pathLength;
+
+    if (_referencePoint == BetaReferencePoint::AMSCenter)
+    {
+        paths[0] -= paths[1];
+        paths[3] -= paths[2];
+    }
+    else
+    {
+        for (int i = BetaNLPars::nTOF - 1; i > 0; --i)
+            paths[i] -= paths[i - 1];
+        paths[0] = 0;
+    }
 
     if (beta >= 1 - 1e-10)
     {
+        if (_referencePoint == BetaReferencePoint::AMSCenter)
+        {
+            hitTimes[1] = paths[1] * inv_c / beta;
+            hitTimes[2] = paths[2] * inv_c / beta;
+            hitTimes[0] = hitTimes[1] + paths[0] * inv_c / beta;
+            hitTimes[3] = hitTimes[2] + paths[3] * inv_c / beta;
+            return hitTimes;
+        }
+
         for (int i = 1; i < BetaNLPars::nTOF; ++i)
             hitTimes[i] = hitTimes[i - 1] + paths[i] * inv_c / beta;
 
@@ -128,13 +146,33 @@ std::vector<double> BetaNL::propagate(double beta) const
 
     const auto &deps = _pars->_energyDeposited;
 
-    for (int i = 1; i < BetaNLPars::nTOF; ++i)
+    const auto scaledEnergyLoss = [&](int station)
     {
-        const int station = i - 1;
         const bool applyScale = _energyLossScaleMode == EnergyLossScaleMode::All ||
                                 (_energyLossScaleMode == EnergyLossScaleMode::S1S2 && station < 2) ||
                                 (_energyLossScaleMode == EnergyLossScaleMode::S2Only && station == 1);
-        energy -= deps[station] * (applyScale ? _energyLossScale : 1.0);
+        return deps[station] * (applyScale ? _energyLossScale : 1.0);
+    };
+
+    if (_referencePoint == BetaReferencePoint::AMSCenter)
+    {
+        hitTimes[1] = paths[1] * inv_c / beta;
+        hitTimes[2] = paths[2] * inv_c / beta;
+
+        const double energyAtS1S2 = energy + scaledEnergyLoss(1);
+        const double energyAtS3S4 = energy - scaledEnergyLoss(2);
+        const double invBetaS1S2 = 1.0 / std::sqrt(1.0 - massSquared / (energyAtS1S2 * energyAtS1S2));
+        const double invBetaS3S4 = 1.0 / std::sqrt(1.0 - massSquared / (energyAtS3S4 * energyAtS3S4));
+
+        hitTimes[0] = hitTimes[1] + paths[0] * inv_c * invBetaS1S2;
+        hitTimes[3] = hitTimes[2] + paths[3] * inv_c * invBetaS3S4;
+        return hitTimes;
+    }
+
+    for (int i = 1; i < BetaNLPars::nTOF; ++i)
+    {
+        const int station = i - 1;
+        energy -= scaledEnergyLoss(station);
         const double inv_beta = 1.0 / std::sqrt(1.0 - massSquared / (energy * energy));
         hitTimes[i] = hitTimes[i - 1] + paths[i] * inv_c * inv_beta;
     }
@@ -232,7 +270,9 @@ double BetaNL::reconstruct()
     minimizer->SetLimitedVariable(0, "invBeta", initialInvBeta, 1e-5, lowerInvBeta, upperInvBeta);
 
     const double timeError = _pars->_hitTimeError[0];
-    const double initialTimeOffset = _pars->_hitTime[0];
+    const double initialTimeOffset = _referencePoint == BetaReferencePoint::AMSCenter
+                                         ? (_pars->_hitTime[0] + _pars->_hitTime[3]) / 2
+                                         : _pars->_hitTime[0];
     const double lowerTimeOffset = initialTimeOffset - 5 * timeError;
     const double upperTimeOffset = initialTimeOffset + 5 * timeError;
     minimizer->SetLimitedVariable(1, "timeOffset", initialTimeOffset, 0.1 * timeError, lowerTimeOffset, upperTimeOffset);

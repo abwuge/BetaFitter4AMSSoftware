@@ -23,7 +23,8 @@ float Util::getMass(int pdgId, double charge)
     }
 }
 
-std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
+std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
+                                                 BetaReferencePoint referencePoint)
 {
     std::vector<ParticleData> particles;
 
@@ -89,7 +90,8 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
     {
         tree->GetEntry(i);
 
-        if (mevmom1[4] == -1000)
+        const int mcReferenceIndex = referencePoint == BetaReferencePoint::AMSCenter ? 10 : 4;
+        if (mevmom1[mcReferenceIndex] == -1000)
             continue;
 
         ParticleData data;
@@ -101,16 +103,15 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
             float mmass = getMass(mpar, mch);
             data.mcMass = mmass;
 
-            // Index 4 --> z = 65.95 cm --> utof(65.2 cm)
-            data.mcInitCoo[0] = mevcoo1[4][0];
-            data.mcInitCoo[1] = mevcoo1[4][1];
-            data.mcInitCoo[2] = mevcoo1[4][2];
+            data.mcInitCoo[0] = mevcoo1[mcReferenceIndex][0];
+            data.mcInitCoo[1] = mevcoo1[mcReferenceIndex][1];
+            data.mcInitCoo[2] = mevcoo1[mcReferenceIndex][2];
 
-            data.mcInitDir[0] = mevdir1[4][0];
-            data.mcInitDir[1] = mevdir1[4][1];
-            data.mcInitDir[2] = mevdir1[4][2];
+            data.mcInitDir[0] = mevdir1[mcReferenceIndex][0];
+            data.mcInitDir[1] = mevdir1[mcReferenceIndex][1];
+            data.mcInitDir[2] = mevdir1[mcReferenceIndex][2];
 
-            float mmom = mevmom1[4];
+            float mmom = mevmom1[mcReferenceIndex];
             data.mcMomentum = mmom;
             data.mcBeta = mmom / sqrt(mmom * mmom + mmass * mmass);
         }
@@ -161,10 +162,11 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile)
 bool Util::saveBeta(const std::string &inputFile,
                     const std::string &outputFile,
                     double energyLossScale,
-                    EnergyLossScaleMode energyLossScaleMode)
+                    EnergyLossScaleMode energyLossScaleMode,
+                    BetaReferencePoint referencePoint)
 {
     // Load particle data from input file
-    std::vector<ParticleData> particles = Util::loadParticleData(inputFile);
+    std::vector<ParticleData> particles = Util::loadParticleData(inputFile, referencePoint);
     if (particles.empty())
     {
         std::cerr << "Error: No particles loaded from input file" << std::endl;
@@ -214,7 +216,8 @@ bool Util::saveBeta(const std::string &inputFile,
                     particle.TOF_hitTimeError,
                     particle.TOF_length),
                 energyLossScale,
-                energyLossScaleMode)
+                energyLossScaleMode,
+                referencePoint)
                 .Beta();
         Z = particle.charge;
 
@@ -457,10 +460,11 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
 
 bool Util::saveEnergyLossScale(const std::string &inputFile,
                                const std::string &outputFile,
-                               EnergyLossScaleMode energyLossScaleMode)
+                               EnergyLossScaleMode energyLossScaleMode,
+                               BetaReferencePoint referencePoint)
 {
     // Load particle data from input file
-    std::vector<ParticleData> particles = Util::loadParticleData(inputFile);
+    std::vector<ParticleData> particles = Util::loadParticleData(inputFile, referencePoint);
     if (particles.empty())
     {
         std::cerr << "Error: No particles loaded from input file" << std::endl;
@@ -507,7 +511,8 @@ bool Util::saveEnergyLossScale(const std::string &inputFile,
                                   particle.TOF_hitTimeError,
                                   particle.TOF_length),
                               2,
-                              energyLossScaleMode)
+                              energyLossScaleMode,
+                              referencePoint)
                               .EnergyLossScale(particle.mcBeta);
         mcBeta = particle.mcBeta;
         position[0] = particle.initCoo[0];
@@ -532,10 +537,11 @@ bool Util::saveEnergyLossScale(const std::string &inputFile,
 bool Util::benchmarkBetaNL(const std::string &inputFile,
                            const std::string &outputFile,
                            double energyLossScale,
-                           EnergyLossScaleMode energyLossScaleMode)
+                           EnergyLossScaleMode energyLossScaleMode,
+                           BetaReferencePoint referencePoint)
 {
     // Load particle data from input file
-    std::vector<ParticleData> particles = Util::loadParticleData(inputFile);
+    std::vector<ParticleData> particles = Util::loadParticleData(inputFile, referencePoint);
     if (particles.empty())
     {
         std::cerr << "Error: No particles loaded from input file" << std::endl;
@@ -562,7 +568,8 @@ bool Util::benchmarkBetaNL(const std::string &inputFile,
                     particle.TOF_hitTimeError,
                     particle.TOF_length),
                 energyLossScale,
-                energyLossScaleMode)
+                energyLossScaleMode,
+                referencePoint)
                 .Beta();
 
         auto end = std::chrono::high_resolution_clock::now();
@@ -586,7 +593,8 @@ bool Util::benchmarkBetaNL(const std::string &inputFile,
 bool Util::saveBetaDiff(const std::string &inputFile,
                         const std::string &outputFile,
                         double energyLossScale,
-                        EnergyLossScaleMode energyLossScaleMode)
+                        EnergyLossScaleMode energyLossScaleMode,
+                        BetaReferencePoint referencePoint)
 {
     TFile *fileIn = TFile::Open(inputFile.c_str(), "READ");
     if (!fileIn || fileIn->IsZombie())
@@ -669,7 +677,8 @@ bool Util::saveBetaDiff(const std::string &inputFile,
                     tof_etl,
                     tof_leng),
                 energyLossScale,
-                energyLossScaleMode)
+                energyLossScaleMode,
+                referencePoint)
                 .Beta();
 
         for (int j = 0; j < 21; ++j)
