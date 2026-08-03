@@ -205,15 +205,18 @@ public:
      * Constructor with BetaNLPars
      * @param pars Parameters for the beta non-linear reconstruction
      * @param energyLossScale Scale factor applied to selected TOF energy losses
+     * @param trackerEnergyLossScale Scale factor applied to tracker energy losses
      * @param energyLossScaleMode TOF stations whose energy losses are scaled
      * @param referencePoint Point at which the fitted beta is defined
      */
     BetaNL(BetaNLPars pars,
            double energyLossScale = 2,
+           double trackerEnergyLossScale = 1,
            EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All,
            BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter)
         : _pars(std::make_shared<BetaNLPars>(pars)),
           _energyLossScale(energyLossScale),
+          _trackerEnergyLossScale(trackerEnergyLossScale),
           _energyLossScaleMode(energyLossScaleMode),
           _referencePoint(referencePoint) {};
 
@@ -260,6 +263,7 @@ private:
     std::shared_ptr<BetaNLPars> _pars;          // Parameters for the beta non-linear reconstruction
     std::shared_ptr<double> _invBeta = nullptr; // Reconstructed 1/beta value
     double _energyLossScale = 2;                // Energy loss scale factor
+    double _trackerEnergyLossScale = 1;         // Tracker energy loss scale factor
     EnergyLossScaleMode _energyLossScaleMode = EnergyLossScaleMode::All;
     BetaReferencePoint _referencePoint = BetaReferencePoint::AMSCenter;
     double _timeOffset = 0;                     // Reconstructed time offset in ns

@@ -67,19 +67,26 @@ means the AMS center between S2 and S3 (default), while `before_tof` means the
 point immediately before the particle enters TOF:
 
 ```bash
-./run.sh input.root output.root 0 1.9 all center
-./run.sh input.root output.root 0 1.9 all before_tof
+./run.sh input.root output.root 0 1.9 1.0 all center
+./run.sh input.root output.root 0 1.9 1.0 all before_tof
 ```
 
-### Global zeta fit
-
-Option `4` fits one energy-loss scale shared by all selected MC events. Each event's common time offset is profiled out analytically; the implementation does not fit one zeta per event and then average the estimates. The input may be one ROOT file or a `.list` file containing one ROOT path per line:
+The TOF and tracker energy-loss scales are independent. The tracker scale is
+the fifth argument and defaults to `1.0`:
 
 ```bash
-./run.sh input_Z2.list global_zeta_Z2.root 4 0.9 all center 0 6
+./run.sh input.root output.root 0 1.9 1.2 all center
 ```
 
-Here `0.9` is the MC beta upper limit and the final two arguments define the zeta search range. The fit reports measured-time and checkpoint-truth results on the same checkpoint-integrable event sample. The output contains a one-entry `globalScaleTree` and a 41-point `globalScaleProfile`. Center mode uses the same reference-point propagation definition as normal beta reconstruction.
+### Joint TOF/tracker scale fit
+
+Option `4` jointly fits one TOF zeta and one tracker energy-loss scale shared by all selected MC events. Each event's common time offset is profiled out analytically; the implementation does not fit per-event scales and then average them. The input may be one ROOT file or a `.list` file containing one ROOT path per line:
+
+```bash
+./run.sh input_Z2.list global_scale_Z2.root 4 0.9 all center 0 6 0 20
+```
+
+Here `0.9` is the MC beta upper limit, `0 6` is the zeta range, and `0 20` is the tracker-scale range. The two scales are minimized together on one event sample that remains valid across the full parameter box. The fit reports measured-time and checkpoint-truth results in `globalScaleTree`, plus 41-point zeta and tracker-scale chi-square slices through the joint optima.
 
 This entry point promotes the global-profile method from [`research/zeta_study_20260722`](research/zeta_study_20260722/README.md) into the main program and extends it to the selectable AMS-center reference point.
 

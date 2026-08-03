@@ -62,31 +62,33 @@
 ./run_local.sh
 ```
 
-能损缩放范围可通过第五个参数在当前的全部前三层（`all`，默认）、S1 和 S2（`s1s2`）以及仅 S2（`s2`）之间切换：
+TOF 能损缩放范围可通过第六个参数在当前的全部前三层（`all`，默认）、S1 和 S2（`s1s2`）以及仅 S2（`s2`）之间切换：
+
+TOF 能损和 tracker 能损使用独立的缩放参数；tracker 缩放默认为 `1.0`：
 
 ```bash
-./run.sh input.root output.root 0 1.9 s1s2
-./run.sh input.root output.root 0 1.9 s2
-./run_local.sh 2 0 1.9 100 s2
+./run.sh input.root output.root 0 1.9 1.0 s1s2
+./run.sh input.root output.root 0 1.9 1.0 s2
+./run_local.sh 2 0 1.9 1.0 100 s2
 ```
 
 重建参考点通过其后的参数选择：`center` 表示 AMS 中心（S2 与 S3 之间，默认），`before_tof` 表示粒子进入 TOF 之前：
 
 ```bash
-./run.sh input.root output.root 0 1.9 all center
-./run.sh input.root output.root 0 1.9 all before_tof
-./run_local.sh 2 0 1.9 100 all center
+./run.sh input.root output.root 0 1.9 1.0 all center
+./run.sh input.root output.root 0 1.9 1.0 all before_tof
+./run_local.sh 2 0 1.9 1.0 100 all center
 ```
 
-### 全局 zeta 拟合
+### TOF/tracker 联合拟合
 
-选项 `4` 在所有选中的 MC 事件上拟合一个共享的能损缩放因子。每个事件的公共时间零点会被解析消去，不会先逐事件拟合 zeta 再求平均。输入既可以是单个 ROOT 文件，也可以是每行一个 ROOT 路径的 `.list` 文件：
+选项 `4` 在所有选中的 MC 事件上同时拟合 TOF 的 `zeta` 与 tracker 能损缩放。两个参数进入同一个总 χ²，每个事件的公共时间零点会被解析消去。输入既可以是单个 ROOT 文件，也可以是每行一个 ROOT 路径的 `.list` 文件：
 
 ```bash
-./run.sh input_Z2.list global_zeta_Z2.root 4 0.9 all center 0 6
+./run.sh input_Z2.list global_scale_Z2.root 4 0.9 all center 0 6 0 20
 ```
 
-其中 `0.9` 是 MC beta 上限，最后两个参数是 zeta 搜索范围。拟合在同一批 checkpoint 可积分事件上同时给出 measured-time 和 checkpoint-truth 两个结果。输出包含单条目的 `globalScaleTree` 和 41 点的 `globalScaleProfile`。中心模式与普通 beta 重建使用相同的参考点传播定义。
+其中 `0.9` 是 MC beta 上限，`0 6` 是 zeta 范围，`0 20` 是 tracker scale 范围。拟合在整个二维参数边界上使用同一批 checkpoint 可积分事件，同时给出 measured-time 和 checkpoint-truth 两个结果。输出包含单条目的 `globalScaleTree`，以及穿过联合最优点的 `globalScaleProfile` 和 `globalTrackerScaleProfile` 两条 41 点 χ² 切片。中心模式与普通 beta 重建使用相同的参考点传播定义。
 
 该入口将 [`research/zeta_study_20260722`](research/zeta_study_20260722/README.md) 的全局 profile 方法纳入主程序，并扩展到可选的 AMS 中心参考点。
 

@@ -4,15 +4,20 @@
 Z=${1:-8}
 fitOption=${2:-0}
 if [[ "$fitOption" == "4" ]]; then
-    energyLossScale=${3:-0.9}
+    betaMax=${3:-0.9}
+    energyLossScaleMode=${4:-all}
+    referencePoint=${5:-center}
+    globalZetaMin=${6:-0}
+    globalZetaMax=${7:-6}
+    trackerScaleMin=${8:-0}
+    trackerScaleMax=${9:-20}
 else
     energyLossScale=${3:-1.0}
+    trackerEnergyLossScale=${4:-1.0}
+    MAX_PROCS=${5:-100}
+    energyLossScaleMode=${6:-all}
+    referencePoint=${7:-center}
 fi
-MAX_PROCS=${4:-100}
-energyLossScaleMode=${5:-all}
-referencePoint=${6:-center}
-globalZetaMin=${7:-0}
-globalZetaMax=${8:-6}
 
 # Array to store child PIDs
 declare -a CHILD_PIDS
@@ -60,15 +65,15 @@ if [[ "$fitOption" == "4" ]]; then
     output_file="${RESULTS_DIR}/${RUN_NUM}.root"
     log_file="${LOGS_DIR}/${RUN_NUM}.log"
     "${SCRIPT_DIR}/run.sh" "$INPUT_LIST" "$output_file" "$fitOption" \
-        "$energyLossScale" "$energyLossScaleMode" "$referencePoint" \
-        "$globalZetaMin" "$globalZetaMax" > "$log_file" 2>&1
+        "$betaMax" "$energyLossScaleMode" "$referencePoint" "$globalZetaMin" \
+        "$globalZetaMax" "$trackerScaleMin" "$trackerScaleMax" > "$log_file" 2>&1
     TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
     README_FILE="${RESULTS_DIR}/README.md"
     if [[ ! -f "$README_FILE" ]]; then
         echo "# Running Parameters Log" > "$README_FILE"
     fi
-    echo "[${TIMESTAMP}] FILE = ${RUN_NUM}.root: Z = ${Z}, fitOption = ${fitOption}, betaMax = ${energyLossScale}, energyLossScaleMode = ${energyLossScaleMode}, referencePoint = ${referencePoint}, zetaRange = [${globalZetaMin}, ${globalZetaMax}]" >> "$README_FILE"
-    echo "Global zeta fit saved to ${output_file}"
+    echo "[${TIMESTAMP}] FILE = ${RUN_NUM}.root: Z = ${Z}, fitOption = ${fitOption}, betaMax = ${betaMax}, energyLossScaleMode = ${energyLossScaleMode}, referencePoint = ${referencePoint}, zetaRange = [${globalZetaMin}, ${globalZetaMax}], trackerScaleRange = [${trackerScaleMin}, ${trackerScaleMax}]" >> "$README_FILE"
+    echo "Global joint scale fit saved to ${output_file}"
     exit 0
 fi
 
@@ -91,7 +96,7 @@ while IFS= read -r input_file; do
     ((counter++))
     
     # Run the process in background
-    ("${SCRIPT_DIR}/run.sh" "$input_file" "$output_file" "$fitOption" "$energyLossScale" "$energyLossScaleMode" "$referencePoint" > "$log_file" 2>&1) &
+    ("${SCRIPT_DIR}/run.sh" "$input_file" "$output_file" "$fitOption" "$energyLossScale" "$trackerEnergyLossScale" "$energyLossScaleMode" "$referencePoint" > "$log_file" 2>&1) &
     
     # Store the PID of the background process
     CHILD_PIDS+=($!)
@@ -121,7 +126,7 @@ if [ ! -f "$README_FILE" ]; then
 fi
 
 # Append run information to README.md
-echo "[${TIMESTAMP}] FILE = ${HADD_FILE}: Z = ${Z}, fitOption = ${fitOption}, energyLossScale = ${energyLossScale}, energyLossScaleMode = ${energyLossScaleMode}, referencePoint = ${referencePoint}, MAX_PROCS = ${MAX_PROCS}  " >> "$README_FILE"
+echo "[${TIMESTAMP}] FILE = ${HADD_FILE}: Z = ${Z}, fitOption = ${fitOption}, energyLossScale = ${energyLossScale}, trackerEnergyLossScale = ${trackerEnergyLossScale}, energyLossScaleMode = ${energyLossScaleMode}, referencePoint = ${referencePoint}, MAX_PROCS = ${MAX_PROCS}  " >> "$README_FILE"
 echo "Run information has been added to ${README_FILE}."
 
 echo "All jobs completed!"

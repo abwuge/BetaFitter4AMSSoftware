@@ -105,11 +105,11 @@ zeta_s2 = zeta_all + (zeta_all - 1) * dE1 / dE2
 
 ```bash
 # 原行为：zeta 作用于 S1、S2、S3
-./run.sh input.root output.root 0 1.9 all
+./run.sh input.root output.root 0 1.9 1.0 all
 
 # 验证支持的简化：zeta 作用于 S1、S2
-./run.sh input.root output.root 0 1.9 s1s2
+./run.sh input.root output.root 0 1.9 1.0 s1s2
 
 # 研究模式：zeta 仅作用于 S2
-./run.sh input.root output.root 0 1.9 s2
+./run.sh input.root output.root 0 1.9 1.0 s2
 ```

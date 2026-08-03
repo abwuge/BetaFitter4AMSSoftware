@@ -3,6 +3,10 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <memory>
+#include <Math/Factory.h>
+#include <Math/Functor.h>
+#include <Math/Minimizer.h>
 
 namespace
 {
@@ -22,15 +26,18 @@ double distance(const Point &first, const Point &second)
 GlobalZetaFitter::GlobalZetaFitter(const std::vector<GlobalZetaEvent> &events,
                                    EnergyLossScaleMode energyLossScaleMode,
                                    BetaReferencePoint referencePoint,
-                                   GlobalZetaTarget target)
+                                   GlobalZetaTarget target,
+                                   double trackerEnergyLossScale)
     : _events(events),
       _energyLossScaleMode(energyLossScaleMode),
       _referencePoint(referencePoint),
-      _target(target)
+      _target(target),
+      _trackerEnergyLossScale(trackerEnergyLossScale)
 {
 }
 
 bool GlobalZetaFitter::PredictHitTimes(const GlobalZetaEvent &event, double zeta,
+                                       double trackerEnergyLossScale,
                                        std::array<double, 4> &hitTimes) const
 {
     hitTimes.fill(0);
@@ -131,7 +138,7 @@ bool GlobalZetaFitter::PredictHitTimes(const GlobalZetaEvent &event, double zeta
         {
             upperTime += segmentTime(distance(current, trackerPoints[layer]) * upperScale,
                                      upperEnergy);
-            upperEnergy += event.trackerEnergyDeposited[layer];
+            upperEnergy += event.trackerEnergyDeposited[layer] * trackerEnergyLossScale;
             current = trackerPoints[layer];
         }
         upperTime += segmentTime(distance(current, tofPoints[1]) * upperScale, upperEnergy);
@@ -144,7 +151,7 @@ bool GlobalZetaFitter::PredictHitTimes(const GlobalZetaEvent &event, double zeta
         {
             lowerTime += segmentTime(distance(current, trackerPoints[layer]) * lowerScale,
                                      lowerEnergy);
-            lowerEnergy -= event.trackerEnergyDeposited[layer];
+            lowerEnergy -= event.trackerEnergyDeposited[layer] * trackerEnergyLossScale;
             current = trackerPoints[layer];
         }
         lowerTime += segmentTime(distance(current, tofPoints[2]) * lowerScale, lowerEnergy);
@@ -169,7 +176,7 @@ bool GlobalZetaFitter::PredictHitTimes(const GlobalZetaEvent &event, double zeta
     {
         hitTimes[2] += segmentTime(distance(current, trackerPoints[layer]) * middleScale,
                                    energy);
-        energy -= event.trackerEnergyDeposited[layer];
+        energy -= event.trackerEnergyDeposited[layer] * trackerEnergyLossScale;
         current = trackerPoints[layer];
     }
     hitTimes[2] += segmentTime(distance(current, tofPoints[2]) * middleScale, energy);
@@ -182,10 +189,11 @@ bool GlobalZetaFitter::PredictHitTimes(const GlobalZetaEvent &event, double zeta
 }
 
 double GlobalZetaFitter::ProfiledEventChi2(const GlobalZetaEvent &event,
-                                            double zeta) const
+                                            double zeta,
+                                            double trackerEnergyLossScale) const
 {
     std::array<double, 4> predicted;
-    if (!PredictHitTimes(event, zeta, predicted))
+    if (!PredictHitTimes(event, zeta, trackerEnergyLossScale, predicted))
         return std::numeric_limits<double>::infinity();
 
     double weightSum = 0;
@@ -219,10 +227,15 @@ double GlobalZetaFitter::ProfiledEventChi2(const GlobalZetaEvent &event,
 
 double GlobalZetaFitter::Chi2(double zeta) const
 {
+    return Chi2(zeta, _trackerEnergyLossScale);
+}
+
+double GlobalZetaFitter::Chi2(double zeta, double trackerEnergyLossScale) const
+{
     long double total = 0;
     for (const GlobalZetaEvent &event : _events)
     {
-        const double eventChi2 = ProfiledEventChi2(event, zeta);
+        const double eventChi2 = ProfiledEventChi2(event, zeta, trackerEnergyLossScale);
         if (!std::isfinite(eventChi2))
             return std::numeric_limits<double>::infinity();
         total += eventChi2;
@@ -232,8 +245,14 @@ double GlobalZetaFitter::Chi2(double zeta) const
 
 bool GlobalZetaFitter::IsValidAt(const GlobalZetaEvent &event, double zeta) const
 {
+    return IsValidAt(event, zeta, _trackerEnergyLossScale);
+}
+
+bool GlobalZetaFitter::IsValidAt(const GlobalZetaEvent &event, double zeta,
+                                 double trackerEnergyLossScale) const
+{
     std::array<double, 4> hitTimes;
-    return PredictHitTimes(event, zeta, hitTimes);
+    return PredictHitTimes(event, zeta, trackerEnergyLossScale, hitTimes);
 }
 
 GlobalZetaResult GlobalZetaFitter::Fit(double zetaMin, double zetaMax) const
@@ -271,8 +290,61 @@ GlobalZetaResult GlobalZetaFitter::Fit(double zetaMin, double zetaMax) const
     }
 
     result.zeta = 0.5 * (lower + upper);
+    result.trackerEnergyLossScale = _trackerEnergyLossScale;
     result.chi2 = Chi2(result.zeta);
     result.chi2PerEvent = result.chi2 / result.entries;
     result.valid = std::isfinite(result.chi2);
     return result;
+}
+
+GlobalZetaResult GlobalZetaFitter::FitJoint(double zetaMin, double zetaMax,
+                                             double trackerScaleMin,
+                                             double trackerScaleMax) const
+{
+    GlobalZetaResult best;
+    best.entries = _events.size();
+    if (_events.empty() || !(zetaMin < zetaMax) ||
+        !(trackerScaleMin < trackerScaleMax))
+        return best;
+
+    const auto objective = [this](const double *parameters)
+    {
+        return Chi2(parameters[0], parameters[1]);
+    };
+    const double zetaMid = 0.5 * (zetaMin + zetaMax);
+    const double trackerMid = 0.5 * (trackerScaleMin + trackerScaleMax);
+    const std::array<std::array<double, 2>, 4> starts = {{
+        {{zetaMid, trackerMid}},
+        {{zetaMin + 0.2 * (zetaMax - zetaMin), trackerScaleMin + 0.2 * (trackerScaleMax - trackerScaleMin)}},
+        {{zetaMin + 0.7 * (zetaMax - zetaMin), trackerScaleMin + 0.4 * (trackerScaleMax - trackerScaleMin)}},
+        {{zetaMin + 0.5 * (zetaMax - zetaMin), trackerScaleMin + 0.8 * (trackerScaleMax - trackerScaleMin)}}
+    }};
+
+    for (const std::array<double, 2> &start : starts)
+    {
+        std::unique_ptr<ROOT::Math::Minimizer> minimizer(
+            ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
+        if (!minimizer)
+            continue;
+        ROOT::Math::Functor functor(objective, 2);
+        minimizer->SetFunction(functor);
+        minimizer->SetLimitedVariable(0, "zeta", start[0], 1e-3,
+                                      zetaMin, zetaMax);
+        minimizer->SetLimitedVariable(1, "trackerEnergyLossScale", start[1], 1e-3,
+                                      trackerScaleMin, trackerScaleMax);
+        minimizer->SetMaxFunctionCalls(10000);
+        minimizer->SetTolerance(1e-5);
+        const bool converged = minimizer->Minimize();
+
+        const double value = minimizer->MinValue();
+        if (!converged || minimizer->Status() != 0 || !std::isfinite(value) ||
+            (best.valid && value >= best.chi2))
+            continue;
+        best.valid = true;
+        best.zeta = minimizer->X()[0];
+        best.trackerEnergyLossScale = minimizer->X()[1];
+        best.chi2 = value;
+        best.chi2PerEvent = value / best.entries;
+    }
+    return best;
 }

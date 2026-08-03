@@ -192,6 +192,10 @@ std::vector<double> BetaNL::propagate(double beta) const
                                 (_energyLossScaleMode == EnergyLossScaleMode::S2Only && station == 1);
         return deps[station] * (applyScale ? _energyLossScale : 1.0);
     };
+    const auto scaledTrackerEnergyLoss = [&](int layer)
+    {
+        return _pars->_trackerEnergyDeposited[layer] * _trackerEnergyLossScale;
+    };
 
     if (_pars->_useTrackerEnergyLoss)
     {
@@ -242,7 +246,7 @@ std::vector<double> BetaNL::propagate(double beta) const
             {
                 upperTime += segmentTime(distance(current, trackerPoints[layer]) * upperScale,
                                          upperEnergy);
-                upperEnergy += _pars->_trackerEnergyDeposited[layer];
+                upperEnergy += scaledTrackerEnergyLoss(layer);
                 current = trackerPoints[layer];
             }
             upperTime += segmentTime(distance(current, tofPoints[1]) * upperScale, upperEnergy);
@@ -255,7 +259,7 @@ std::vector<double> BetaNL::propagate(double beta) const
             {
                 lowerTime += segmentTime(distance(current, trackerPoints[layer]) * lowerScale,
                                          lowerEnergy);
-                lowerEnergy -= _pars->_trackerEnergyDeposited[layer];
+                lowerEnergy -= scaledTrackerEnergyLoss(layer);
                 current = trackerPoints[layer];
             }
             lowerTime += segmentTime(distance(current, tofPoints[2]) * lowerScale, lowerEnergy);
@@ -279,7 +283,7 @@ std::vector<double> BetaNL::propagate(double beta) const
         {
             hitTimes[2] += segmentTime(distance(current, trackerPoints[layer]) * middleScale,
                                        energy);
-            energy -= _pars->_trackerEnergyDeposited[layer];
+            energy -= scaledTrackerEnergyLoss(layer);
             current = trackerPoints[layer];
         }
         hitTimes[2] += segmentTime(distance(current, tofPoints[2]) * middleScale, energy);

@@ -165,8 +165,7 @@ float Util::getMass(int pdgId, double charge)
 }
 
 std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
-                                                 BetaReferencePoint referencePoint,
-                                                 bool requireTrackerEnergyLoss)
+                                                  BetaReferencePoint referencePoint)
 {
     std::vector<ParticleData> particles;
 
@@ -222,14 +221,13 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
     tree->SetBranchAddress("tof_dir", tof_dir);
     tree->SetBranchAddress("tof_edep", tof_edep);
     tree->SetBranchAddress("tk_pos", tk_pos);
-    if (requireTrackerEnergyLoss && !tree->GetBranch("tk_edep"))
+    if (!tree->GetBranch("tk_edep"))
     {
         std::cerr << "Error: Missing required tk_edep branch in " << inputFile << std::endl;
         file->Close();
         return particles;
     }
-    if (tree->GetBranch("tk_edep"))
-        tree->SetBranchAddress("tk_edep", tk_edep);
+    tree->SetBranchAddress("tk_edep", tk_edep);
     tree->SetBranchAddress("tk_q", tk_q);
     tree->SetBranchAddress("tk_qin", tk_qin);
     tree->SetBranchAddress("tk_rigidity1", tk_rigidity1);
@@ -316,12 +314,13 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
 bool Util::saveBeta(const std::string &inputFile,
                     const std::string &outputFile,
                     double energyLossScale,
+                    double trackerEnergyLossScale,
                     EnergyLossScaleMode energyLossScaleMode,
                     BetaReferencePoint referencePoint)
 {
     // Load particle data from input file
     std::vector<ParticleData> particles =
-        Util::loadParticleData(inputFile, referencePoint, true);
+        Util::loadParticleData(inputFile, referencePoint);
     if (particles.empty())
     {
         std::cerr << "Error: No particles loaded from input file" << std::endl;
@@ -399,6 +398,7 @@ bool Util::saveBeta(const std::string &inputFile,
                     particle.TOF_hitTimeError,
                     particle.TOF_length),
                 energyLossScale,
+                1.0,
                 energyLossScaleMode,
                 referencePoint)
                 .Beta();
@@ -415,6 +415,7 @@ bool Util::saveBeta(const std::string &inputFile,
                     particle.TRACKER_hitEdep,
                     trackerPosition),
                 energyLossScale,
+                trackerEnergyLossScale,
                 energyLossScaleMode,
                 referencePoint)
                 .Beta();
@@ -710,6 +711,7 @@ bool Util::saveEnergyLossScale(const std::string &inputFile,
                                   particle.TOF_hitTimeError,
                                   particle.TOF_length),
                               2,
+                              1.0,
                               energyLossScaleMode,
                               referencePoint)
                               .EnergyLossScale(particle.mcBeta);
@@ -739,7 +741,9 @@ bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
                                      double zetaMin,
                                      double zetaMax,
                                      EnergyLossScaleMode energyLossScaleMode,
-                                     BetaReferencePoint referencePoint)
+                                     BetaReferencePoint referencePoint,
+                                     double trackerScaleMin,
+                                     double trackerScaleMax)
 {
     if (!(betaMax > 0.1 && betaMax < 1.0))
     {
@@ -749,6 +753,11 @@ bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
     if (!(zetaMin < zetaMax))
     {
         std::cerr << "Error: Global fit zeta minimum must be below maximum" << std::endl;
+        return false;
+    }
+    if (!(trackerScaleMin < trackerScaleMax))
+    {
+        std::cerr << "Error: Tracker scale minimum must be below maximum" << std::endl;
         return false;
     }
 
@@ -865,7 +874,10 @@ bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
                                        event.pathLength, mass, event.checkpointTruthTime))
             continue;
         ++truthIntegrableEntries;
-        if (validator.IsValidAt(event, zetaMin) && validator.IsValidAt(event, zetaMax))
+        if (validator.IsValidAt(event, zetaMin, trackerScaleMin) &&
+            validator.IsValidAt(event, zetaMin, trackerScaleMax) &&
+            validator.IsValidAt(event, zetaMax, trackerScaleMin) &&
+            validator.IsValidAt(event, zetaMax, trackerScaleMax))
             stableEvents.push_back(event);
 
         const int charge = static_cast<int>(mch + 0.5);
@@ -881,8 +893,10 @@ bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
                                     GlobalZetaTarget::MeasuredTime);
     GlobalZetaFitter truthFitter(stableEvents, energyLossScaleMode, referencePoint,
                                  GlobalZetaTarget::CheckpointTruth);
-    const GlobalZetaResult measuredResult = measuredFitter.Fit(zetaMin, zetaMax);
-    const GlobalZetaResult truthResult = truthFitter.Fit(zetaMin, zetaMax);
+    const GlobalZetaResult measuredResult = measuredFitter.FitJoint(
+        zetaMin, zetaMax, trackerScaleMin, trackerScaleMax);
+    const GlobalZetaResult truthResult = truthFitter.FitJoint(
+        zetaMin, zetaMax, trackerScaleMin, trackerScaleMax);
     if (!measuredResult.valid || !truthResult.valid)
     {
         std::cerr << "Error: Global energy-loss scale fit failed" << std::endl;
@@ -899,6 +913,8 @@ bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
     double fittedZeta = measuredResult.zeta;
     double fittedZetaMeasured = measuredResult.zeta;
     double fittedZetaTruth = truthResult.zeta;
+    double fittedTrackerScale = measuredResult.trackerEnergyLossScale;
+    double fittedTrackerScaleTruth = truthResult.trackerEnergyLossScale;
     double chi2 = measuredResult.chi2;
     double chi2PerEvent = measuredResult.chi2PerEvent;
     double chi2Truth = truthResult.chi2;
@@ -906,6 +922,8 @@ bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
     double storedBetaMax = betaMax;
     double storedZetaMin = zetaMin;
     double storedZetaMax = zetaMax;
+    double storedTrackerScaleMin = trackerScaleMin;
+    double storedTrackerScaleMax = trackerScaleMax;
     Long64_t storedInputEntries = inputEntries;
     Long64_t storedFourHitEntries = validFourHitEntries;
     Long64_t storedTrackerCompleteEntries = trackerCompleteEntries;
@@ -921,11 +939,19 @@ bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
                      fittedZeta >= zetaMax - boundaryTolerance;
     int truthAtBoundary = fittedZetaTruth <= zetaMin + boundaryTolerance ||
                           fittedZetaTruth >= zetaMax - boundaryTolerance;
+    const double trackerBoundaryTolerance = (trackerScaleMax - trackerScaleMin) / 40.0;
+    int trackerAtBoundary = fittedTrackerScale <= trackerScaleMin + trackerBoundaryTolerance ||
+                            fittedTrackerScale >= trackerScaleMax - trackerBoundaryTolerance;
+    int trackerTruthAtBoundary =
+        fittedTrackerScaleTruth <= trackerScaleMin + trackerBoundaryTolerance ||
+        fittedTrackerScaleTruth >= trackerScaleMax - trackerBoundaryTolerance;
 
     TTree summary("globalScaleTree", "Global Energy Loss Scale Fit");
     summary.Branch("energyLossScale", &fittedZeta, "energyLossScale/D");
     summary.Branch("energyLossScaleMeasured", &fittedZetaMeasured, "energyLossScaleMeasured/D");
     summary.Branch("energyLossScaleTruth", &fittedZetaTruth, "energyLossScaleTruth/D");
+    summary.Branch("trackerEnergyLossScale", &fittedTrackerScale, "trackerEnergyLossScale/D");
+    summary.Branch("trackerEnergyLossScaleTruth", &fittedTrackerScaleTruth, "trackerEnergyLossScaleTruth/D");
     summary.Branch("chi2", &chi2, "chi2/D");
     summary.Branch("chi2PerEvent", &chi2PerEvent, "chi2PerEvent/D");
     summary.Branch("chi2Truth", &chi2Truth, "chi2Truth/D");
@@ -933,6 +959,8 @@ bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
     summary.Branch("betaMax", &storedBetaMax, "betaMax/D");
     summary.Branch("zetaMin", &storedZetaMin, "zetaMin/D");
     summary.Branch("zetaMax", &storedZetaMax, "zetaMax/D");
+    summary.Branch("trackerScaleMin", &storedTrackerScaleMin, "trackerScaleMin/D");
+    summary.Branch("trackerScaleMax", &storedTrackerScaleMax, "trackerScaleMax/D");
     summary.Branch("inputEntries", &storedInputEntries, "inputEntries/L");
     summary.Branch("fourHitEntries", &storedFourHitEntries, "fourHitEntries/L");
     summary.Branch("trackerCompleteEntries", &storedTrackerCompleteEntries, "trackerCompleteEntries/L");
@@ -945,16 +973,24 @@ bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
     summary.Branch("referencePoint", &storedReferencePoint, "referencePoint/I");
     summary.Branch("atBoundary", &atBoundary, "atBoundary/I");
     summary.Branch("truthAtBoundary", &truthAtBoundary, "truthAtBoundary/I");
+    summary.Branch("trackerAtBoundary", &trackerAtBoundary, "trackerAtBoundary/I");
+    summary.Branch("trackerTruthAtBoundary", &trackerTruthAtBoundary, "trackerTruthAtBoundary/I");
     summary.Fill();
     summary.Write();
 
-    TTree profile("globalScaleProfile", "Global Energy Loss Scale Profile");
+    TTree profile("globalScaleProfile", "Global TOF Energy Loss Scale Slice");
     double profileZeta = 0;
+    double profileZetaTruth = 0;
+    double profileTrackerScale = fittedTrackerScale;
+    double profileTrackerScaleTruth = fittedTrackerScaleTruth;
     double profileChi2 = 0;
     double deltaChi2 = 0;
     double profileChi2Truth = 0;
     double deltaChi2Truth = 0;
     profile.Branch("energyLossScale", &profileZeta, "energyLossScale/D");
+    profile.Branch("energyLossScaleTruth", &profileZetaTruth, "energyLossScaleTruth/D");
+    profile.Branch("trackerEnergyLossScale", &profileTrackerScale, "trackerEnergyLossScale/D");
+    profile.Branch("trackerEnergyLossScaleTruth", &profileTrackerScaleTruth, "trackerEnergyLossScaleTruth/D");
     profile.Branch("chi2", &profileChi2, "chi2/D");
     profile.Branch("deltaChi2", &deltaChi2, "deltaChi2/D");
     profile.Branch("chi2Truth", &profileChi2Truth, "chi2Truth/D");
@@ -963,17 +999,45 @@ bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
     for (int point = 0; point < profilePoints; ++point)
     {
         profileZeta = zetaMin + (zetaMax - zetaMin) * point / (profilePoints - 1);
-        profileChi2 = measuredFitter.Chi2(profileZeta);
+        profileZetaTruth = profileZeta;
+        profileChi2 = measuredFitter.Chi2(profileZeta, fittedTrackerScale);
         deltaChi2 = profileChi2 - measuredResult.chi2;
-        profileChi2Truth = truthFitter.Chi2(profileZeta);
+        profileChi2Truth = truthFitter.Chi2(profileZeta, fittedTrackerScaleTruth);
         deltaChi2Truth = profileChi2Truth - truthResult.chi2;
         profile.Fill();
     }
     profile.Write();
+
+    TTree trackerProfile("globalTrackerScaleProfile", "Global Tracker Energy Loss Scale Slice");
+    profileZeta = fittedZetaMeasured;
+    profileZetaTruth = fittedZetaTruth;
+    trackerProfile.Branch("energyLossScale", &profileZeta, "energyLossScale/D");
+    trackerProfile.Branch("energyLossScaleTruth", &profileZetaTruth, "energyLossScaleTruth/D");
+    trackerProfile.Branch("trackerEnergyLossScale", &profileTrackerScale, "trackerEnergyLossScale/D");
+    trackerProfile.Branch("trackerEnergyLossScaleTruth", &profileTrackerScaleTruth, "trackerEnergyLossScaleTruth/D");
+    trackerProfile.Branch("chi2", &profileChi2, "chi2/D");
+    trackerProfile.Branch("deltaChi2", &deltaChi2, "deltaChi2/D");
+    trackerProfile.Branch("chi2Truth", &profileChi2Truth, "chi2Truth/D");
+    trackerProfile.Branch("deltaChi2Truth", &deltaChi2Truth, "deltaChi2Truth/D");
+    for (int point = 0; point < profilePoints; ++point)
+    {
+        profileTrackerScale = trackerScaleMin +
+                              (trackerScaleMax - trackerScaleMin) * point /
+                                  (profilePoints - 1);
+        profileTrackerScaleTruth = profileTrackerScale;
+        profileChi2 = measuredFitter.Chi2(fittedZetaMeasured, profileTrackerScale);
+        deltaChi2 = profileChi2 - measuredResult.chi2;
+        profileChi2Truth = truthFitter.Chi2(fittedZetaTruth, profileTrackerScale);
+        deltaChi2Truth = profileChi2Truth - truthResult.chi2;
+        trackerProfile.Fill();
+    }
+    trackerProfile.Write();
     output.Close();
 
-    std::cout << "Global measured-time zeta fit: " << fittedZetaMeasured
-              << ", checkpoint-truth zeta fit: " << fittedZetaTruth
+    std::cout << "Global measured-time joint fit: zeta=" << fittedZetaMeasured
+              << ", trackerScale=" << fittedTrackerScale
+              << "; checkpoint-truth joint fit: zeta=" << fittedZetaTruth
+              << ", trackerScale=" << fittedTrackerScaleTruth
               << ", measured chi2/event: " << chi2PerEvent
               << ", stable entries: " << storedStableEntries
               << ", beta-selected entries: " << storedBetaSelectedEntries
@@ -1015,6 +1079,7 @@ bool Util::benchmarkBetaNL(const std::string &inputFile,
                     particle.TOF_hitTimeError,
                     particle.TOF_length),
                 energyLossScale,
+                1.0,
                 energyLossScaleMode,
                 referencePoint)
                 .Beta();
@@ -1124,6 +1189,7 @@ bool Util::saveBetaDiff(const std::string &inputFile,
                     tof_etl,
                     tof_leng),
                 energyLossScale,
+                1.0,
                 energyLossScaleMode,
                 referencePoint)
                 .Beta();
