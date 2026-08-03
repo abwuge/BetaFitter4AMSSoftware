@@ -31,11 +31,14 @@ namespace Util
      * @brief Load particle data from amstreea in ROOT file
      *
      * @param inputFile Path to the ROOT file containing particle data
+     * @param referencePoint Reference point used to derive MC beta
+     * @param requireTrackerEnergyLoss Require the tk_edep branch for tracker-aware reconstruction
      * @return std::vector<ParticleData> Vector of particle data, empty if loading fails
      */
     std::vector<ParticleData> loadParticleData(
         const std::string &inputFile,
-        BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter);
+        BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter,
+        bool requireTrackerEnergyLoss = false);
 
     /**
      * @brief Save beta reconstruction results to ROOT file

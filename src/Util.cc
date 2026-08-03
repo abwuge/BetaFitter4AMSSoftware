@@ -165,7 +165,8 @@ float Util::getMass(int pdgId, double charge)
 }
 
 std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
-                                                 BetaReferencePoint referencePoint)
+                                                 BetaReferencePoint referencePoint,
+                                                 bool requireTrackerEnergyLoss)
 {
     std::vector<ParticleData> particles;
 
@@ -199,6 +200,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
     float tof_dir[4][3]{};
     float tof_edep[4]{};
     float tk_pos[9][3]{};
+    float tk_edep[9]{};
     float tk_q[2]{};
     float tk_qin[2][3]{};
     float tk_rigidity1[3][3][7]{};
@@ -220,6 +222,14 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
     tree->SetBranchAddress("tof_dir", tof_dir);
     tree->SetBranchAddress("tof_edep", tof_edep);
     tree->SetBranchAddress("tk_pos", tk_pos);
+    if (requireTrackerEnergyLoss && !tree->GetBranch("tk_edep"))
+    {
+        std::cerr << "Error: Missing required tk_edep branch in " << inputFile << std::endl;
+        file->Close();
+        return particles;
+    }
+    if (tree->GetBranch("tk_edep"))
+        tree->SetBranchAddress("tk_edep", tk_edep);
     tree->SetBranchAddress("tk_q", tk_q);
     tree->SetBranchAddress("tk_qin", tk_qin);
     tree->SetBranchAddress("tk_rigidity1", tk_rigidity1);
@@ -267,7 +277,9 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
 
         for (int j = 0; j < ParticleData::TOF_MAX_HITS; ++j)
         {
-            // TODO: this position might not be correct
+            // TODO: verify that tof_pos is the hit position used for path calculation
+            data.TOF_hitX[j] = tof_pos[j][0];
+            data.TOF_hitY[j] = tof_pos[j][1];
             data.TOF_hitZ[j] = tof_pos[j][2];
             data.TOF_hitTime[j] = tof_tl[j];
             // TODO: SO FAR it's constant, but it might not be correct
@@ -281,6 +293,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
             data.TRACKER_hitX[j] = tk_pos[j][0];
             data.TRACKER_hitY[j] = tk_pos[j][1];
             data.TRACKER_hitZ[j] = tk_pos[j][2];
+            data.TRACKER_hitEdep[j] = tk_edep[j];
             // TODO: Though here it's constant, but it's NOT totally correct
             data.TRACKER_hitError[j] = 6.3e-4;
         }
@@ -307,7 +320,8 @@ bool Util::saveBeta(const std::string &inputFile,
                     BetaReferencePoint referencePoint)
 {
     // Load particle data from input file
-    std::vector<ParticleData> particles = Util::loadParticleData(inputFile, referencePoint);
+    std::vector<ParticleData> particles =
+        Util::loadParticleData(inputFile, referencePoint, true);
     if (particles.empty())
     {
         std::cerr << "Error: No particles loaded from input file" << std::endl;
@@ -328,6 +342,7 @@ bool Util::saveBeta(const std::string &inputFile,
     double innerRigidity = 0;
     double betaRigidity = 0;
     double linearBeta = 0;
+    double nonlinearBetaLegacy = 0;
     double nonlinearBeta = 0;
     int Z = 0;
 
@@ -336,18 +351,45 @@ bool Util::saveBeta(const std::string &inputFile,
     tree->Branch("innerRigidity", &innerRigidity, "innerRigidity/D");
     tree->Branch("betaRigidity", &betaRigidity, "betaRigidity/D");
     tree->Branch("linearBeta", &linearBeta, "linearBeta/D");
+    tree->Branch("nonlinearBetaLegacy", &nonlinearBetaLegacy, "nonlinearBetaLegacy/D");
     tree->Branch("nonlinearBeta", &nonlinearBeta, "nonlinearBeta/D");
     tree->Branch("Z", &Z, "Z/I");
 
     // Process each particle
     for (const auto &particle : particles)
     {
+        bool trackerComplete = true;
+        for (int layer = 1; layer <= 7; ++layer)
+            trackerComplete = trackerComplete && particle.TRACKER_hitEdep[layer] > 0 &&
+                              std::isfinite(particle.TRACKER_hitEdep[layer]) &&
+                              std::isfinite(particle.TRACKER_hitX[layer]) &&
+                              std::isfinite(particle.TRACKER_hitY[layer]) &&
+                              std::isfinite(particle.TRACKER_hitZ[layer]);
+        if (!trackerComplete || !(particle.TRACKER_hitZ[4] > 0) ||
+            !(particle.TRACKER_hitZ[5] < 0))
+            continue;
+
+        float tofPosition[ParticleData::TOF_MAX_HITS][3];
+        float trackerPosition[ParticleData::TRACKER_MAX_HITS][3];
+        for (int station = 0; station < ParticleData::TOF_MAX_HITS; ++station)
+        {
+            tofPosition[station][0] = particle.TOF_hitX[station];
+            tofPosition[station][1] = particle.TOF_hitY[station];
+            tofPosition[station][2] = particle.TOF_hitZ[station];
+        }
+        for (int layer = 0; layer < ParticleData::TRACKER_MAX_HITS; ++layer)
+        {
+            trackerPosition[layer][0] = particle.TRACKER_hitX[layer];
+            trackerPosition[layer][1] = particle.TRACKER_hitY[layer];
+            trackerPosition[layer][2] = particle.TRACKER_hitZ[layer];
+        }
+
         // Get beta values
         mcBeta = particle.mcBeta;
         innerRigidity = particle.innerRigidity;
         betaRigidity = particle.betaRigidity;
         linearBeta = particle.betaLinear;
-        nonlinearBeta =
+        nonlinearBetaLegacy =
             BetaNL(
                 BetaNLPars(
                     particle.betaLinear,
@@ -356,6 +398,22 @@ bool Util::saveBeta(const std::string &inputFile,
                     particle.TOF_hitTime,
                     particle.TOF_hitTimeError,
                     particle.TOF_length),
+                energyLossScale,
+                energyLossScaleMode,
+                referencePoint)
+                .Beta();
+        nonlinearBeta =
+            BetaNL(
+                BetaNLPars(
+                    particle.betaLinear,
+                    particle.mass,
+                    particle.TOF_hitEdep,
+                    particle.TOF_hitTime,
+                    particle.TOF_hitTimeError,
+                    particle.TOF_length,
+                    tofPosition,
+                    particle.TRACKER_hitEdep,
+                    trackerPosition),
                 energyLossScale,
                 energyLossScaleMode,
                 referencePoint)
@@ -704,7 +762,7 @@ bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
     chain.LoadTree(0);
     const char *requiredBranches[] = {
         "mpar", "mch", "mevmom1", "mevcoo1", "tof_tl", "tof_edep",
-        "tof_leng", "tof_pos"};
+        "tof_leng", "tof_pos", "tk_edep", "tk_pos"};
     for (const char *branch : requiredBranches)
         if (!chain.GetBranch(branch))
         {
@@ -720,6 +778,8 @@ bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
     float tofEnergyDeposited[4] = {};
     float tofLength[4] = {};
     float tofPosition[4][3] = {};
+    float trackerEnergyDeposited[9] = {};
+    float trackerPosition[9][3] = {};
     chain.SetBranchStatus("*", 0);
     for (const char *branch : requiredBranches)
         chain.SetBranchStatus(branch, 1);
@@ -731,9 +791,12 @@ bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
     chain.SetBranchAddress("tof_edep", tofEnergyDeposited);
     chain.SetBranchAddress("tof_leng", tofLength);
     chain.SetBranchAddress("tof_pos", tofPosition);
+    chain.SetBranchAddress("tk_edep", trackerEnergyDeposited);
+    chain.SetBranchAddress("tk_pos", trackerPosition);
 
     const Long64_t inputEntries = chain.GetEntries();
     Long64_t validFourHitEntries = 0;
+    Long64_t trackerCompleteEntries = 0;
     Long64_t betaSelectedEntries = 0;
     Long64_t truthIntegrableEntries = 0;
     std::vector<GlobalZetaEvent> stableEvents;
@@ -765,10 +828,32 @@ bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
             event.hitTime[station] = tofTime[station];
             event.energyDeposited[station] = tofEnergyDeposited[station] * 1e-3;
             event.pathLength[station] = tofLength[station];
+            for (int coordinate = 0; coordinate < 3; ++coordinate)
+                event.tofPosition[station][coordinate] = tofPosition[station][coordinate];
         }
         if (!valid)
             continue;
         ++validFourHitEntries;
+
+        for (int layer = 1; layer <= 7; ++layer)
+        {
+            if (!(trackerEnergyDeposited[layer] > 0) ||
+                !std::isfinite(trackerEnergyDeposited[layer]))
+            {
+                valid = false;
+                break;
+            }
+            event.trackerEnergyDeposited[layer] = trackerEnergyDeposited[layer] * 1e-3;
+            for (int coordinate = 0; coordinate < 3; ++coordinate)
+            {
+                if (!std::isfinite(trackerPosition[layer][coordinate]))
+                    valid = false;
+                event.trackerPosition[layer][coordinate] = trackerPosition[layer][coordinate];
+            }
+        }
+        if (!valid)
+            continue;
+        ++trackerCompleteEntries;
 
         event.mass = mass;
         event.mcBeta = momentum / std::sqrt(momentum * momentum + mass * mass);
@@ -823,6 +908,7 @@ bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
     double storedZetaMax = zetaMax;
     Long64_t storedInputEntries = inputEntries;
     Long64_t storedFourHitEntries = validFourHitEntries;
+    Long64_t storedTrackerCompleteEntries = trackerCompleteEntries;
     Long64_t storedBetaSelectedEntries = betaSelectedEntries;
     Long64_t storedTruthIntegrableEntries = truthIntegrableEntries;
     Long64_t storedStableEntries = measuredResult.entries;
@@ -849,6 +935,7 @@ bool Util::saveGlobalEnergyLossScale(const std::string &inputFile,
     summary.Branch("zetaMax", &storedZetaMax, "zetaMax/D");
     summary.Branch("inputEntries", &storedInputEntries, "inputEntries/L");
     summary.Branch("fourHitEntries", &storedFourHitEntries, "fourHitEntries/L");
+    summary.Branch("trackerCompleteEntries", &storedTrackerCompleteEntries, "trackerCompleteEntries/L");
     summary.Branch("betaSelectedEntries", &storedBetaSelectedEntries, "betaSelectedEntries/L");
     summary.Branch("truthIntegrableEntries", &storedTruthIntegrableEntries, "truthIntegrableEntries/L");
     summary.Branch("stableEntries", &storedStableEntries, "stableEntries/L");

@@ -5,6 +5,21 @@
 #include <Math/Minimizer.h>
 #include <TMath.h>
 
+#include <limits>
+
+namespace
+{
+using Point = std::array<double, 3>;
+
+double distance(const Point &first, const Point &second)
+{
+    const double dx = first[0] - second[0];
+    const double dy = first[1] - second[1];
+    const double dz = first[2] - second[2];
+    return std::sqrt(dx * dx + dy * dy + dz * dz);
+}
+}
+
 BetaNLPars::BetaNLPars(
     const double beta,
     const double mass,
@@ -19,6 +34,30 @@ BetaNLPars::BetaNLPars(
     _hitTimeError = hitTimeError;
     _pathLength = pathLength;
     init();
+}
+
+BetaNLPars::BetaNLPars(
+    const double beta,
+    const double mass,
+    const float energyDeposited[nTOF],
+    const float hitTime[nTOF],
+    const float hitTimeError[nTOF],
+    const float pathLength[nTOF],
+    const float tofPosition[nTOF][3],
+    const float trackerEnergyDeposited[9],
+    const float trackerPosition[9][3])
+    : BetaNLPars(beta, mass, energyDeposited, hitTime, hitTimeError, pathLength)
+{
+    for (int station = 0; station < nTOF; ++station)
+        for (int coordinate = 0; coordinate < 3; ++coordinate)
+            _tofPosition[station][coordinate] = tofPosition[station][coordinate];
+    for (int layer = 0; layer < 9; ++layer)
+    {
+        _trackerEnergyDeposited[layer] = trackerEnergyDeposited[layer] * 1e-3;
+        for (int coordinate = 0; coordinate < 3; ++coordinate)
+            _trackerPosition[layer][coordinate] = trackerPosition[layer][coordinate];
+    }
+    _useTrackerEnergyLoss = true;
 }
 
 BetaNLPars::BetaNLPars(
@@ -153,6 +192,103 @@ std::vector<double> BetaNL::propagate(double beta) const
                                 (_energyLossScaleMode == EnergyLossScaleMode::S2Only && station == 1);
         return deps[station] * (applyScale ? _energyLossScale : 1.0);
     };
+
+    if (_pars->_useTrackerEnergyLoss)
+    {
+        const auto inverseBetaAtEnergy = [&](double value)
+        {
+            if (!(value > mass) || !std::isfinite(value))
+                return std::numeric_limits<double>::quiet_NaN();
+            return 1.0 / std::sqrt(1.0 - massSquared / (value * value));
+        };
+        const auto segmentTime = [&](double length, double segmentEnergy)
+        {
+            return length * inv_c * inverseBetaAtEnergy(segmentEnergy);
+        };
+        const auto &tofPoints = _pars->_tofPosition;
+        const auto &trackerPoints = _pars->_trackerPosition;
+        const auto trackerPathScale = [&](const Point &first, const Point &last,
+                                          int firstLayer, int lastLayer,
+                                          double targetLength)
+        {
+            double geometricLength = distance(first, trackerPoints[firstLayer]);
+            const int step = firstLayer < lastLayer ? 1 : -1;
+            for (int layer = firstLayer; layer != lastLayer; layer += step)
+                geometricLength += distance(trackerPoints[layer], trackerPoints[layer + step]);
+            geometricLength += distance(trackerPoints[lastLayer], last);
+            return geometricLength > 0 ? std::abs(targetLength) / geometricLength : 0.0;
+        };
+
+        if (_referencePoint == BetaReferencePoint::AMSCenter)
+        {
+            // Integrate from the AMS center to the upper and lower TOF sides.
+            const double centerFraction = trackerPoints[4][2] /
+                                          (trackerPoints[4][2] - trackerPoints[5][2]);
+            Point center;
+            for (int coordinate = 0; coordinate < 3; ++coordinate)
+                center[coordinate] = trackerPoints[4][coordinate] +
+                                     centerFraction * (trackerPoints[5][coordinate] -
+                                                       trackerPoints[4][coordinate]);
+
+            const double upperScale = trackerPathScale(center, tofPoints[1], 4, 1, paths[1]);
+            const double lowerScale = trackerPathScale(center, tofPoints[2], 5, 7, paths[2]);
+            if (!(upperScale > 0) || !(lowerScale > 0))
+                return hitTimes;
+
+            double upperEnergy = energy;
+            double upperTime = 0;
+            Point current = center;
+            for (int layer = 4; layer >= 1; --layer)
+            {
+                upperTime += segmentTime(distance(current, trackerPoints[layer]) * upperScale,
+                                         upperEnergy);
+                upperEnergy += _pars->_trackerEnergyDeposited[layer];
+                current = trackerPoints[layer];
+            }
+            upperTime += segmentTime(distance(current, tofPoints[1]) * upperScale, upperEnergy);
+            hitTimes[1] = -upperTime;
+
+            double lowerEnergy = energy;
+            double lowerTime = 0;
+            current = center;
+            for (int layer = 5; layer <= 7; ++layer)
+            {
+                lowerTime += segmentTime(distance(current, trackerPoints[layer]) * lowerScale,
+                                         lowerEnergy);
+                lowerEnergy -= _pars->_trackerEnergyDeposited[layer];
+                current = trackerPoints[layer];
+            }
+            lowerTime += segmentTime(distance(current, tofPoints[2]) * lowerScale, lowerEnergy);
+            hitTimes[2] = lowerTime;
+
+            hitTimes[0] = hitTimes[1] + segmentTime(paths[0], upperEnergy + scaledEnergyLoss(1));
+            hitTimes[3] = hitTimes[2] + segmentTime(paths[3], lowerEnergy - scaledEnergyLoss(2));
+            return hitTimes;
+        }
+
+        // BeforeTOF propagation crosses the tracker once between TOF stations 2 and 3.
+        energy -= scaledEnergyLoss(0);
+        hitTimes[1] = segmentTime(paths[1], energy);
+        energy -= scaledEnergyLoss(1);
+
+        const double middleScale = trackerPathScale(tofPoints[1], tofPoints[2], 1, 7, paths[2]);
+        if (!(middleScale > 0))
+            return hitTimes;
+        Point current = tofPoints[1];
+        for (int layer = 1; layer <= 7; ++layer)
+        {
+            hitTimes[2] += segmentTime(distance(current, trackerPoints[layer]) * middleScale,
+                                       energy);
+            energy -= _pars->_trackerEnergyDeposited[layer];
+            current = trackerPoints[layer];
+        }
+        hitTimes[2] += segmentTime(distance(current, tofPoints[2]) * middleScale, energy);
+        hitTimes[2] += hitTimes[1];
+
+        energy -= scaledEnergyLoss(2);
+        hitTimes[3] = hitTimes[2] + segmentTime(paths[3], energy);
+        return hitTimes;
+    }
 
     if (_referencePoint == BetaReferencePoint::AMSCenter)
     {

@@ -15,6 +15,8 @@ struct ParticleData
     float initDir[3];
     float initCoo[3];
     static constexpr int TOF_MAX_HITS = 4;
+    float TOF_hitX[TOF_MAX_HITS];
+    float TOF_hitY[TOF_MAX_HITS];
     float TOF_hitZ[TOF_MAX_HITS];
     float TOF_hitTime[TOF_MAX_HITS];
     float TOF_hitTimeError[TOF_MAX_HITS];
@@ -26,6 +28,7 @@ struct ParticleData
     float TRACKER_hitX[TRACKER_MAX_HITS];
     float TRACKER_hitY[TRACKER_MAX_HITS];
     float TRACKER_hitZ[TRACKER_MAX_HITS];
+    float TRACKER_hitEdep[TRACKER_MAX_HITS];
     float TRACKER_hitError[TRACKER_MAX_HITS];
 
     // MC truth information
@@ -47,6 +50,8 @@ struct ParticleData
                      betaRigidity(0.0f),
                      initDir{},
                      initCoo{},
+                     TOF_hitX{},
+                     TOF_hitY{},
                      TOF_hitZ{},
                      TOF_hitTime{},
                      TOF_hitTimeError{},
@@ -55,6 +60,7 @@ struct ParticleData
                      TRACKER_hitX{},
                      TRACKER_hitY{},
                      TRACKER_hitZ{},
+                     TRACKER_hitEdep{},
                      TRACKER_hitError{},
                      isMC(false),
                      mcGeantId(0),

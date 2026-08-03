@@ -12,9 +12,12 @@ struct GlobalZetaEvent
     float mcBeta = 0;
     float mass = 0;
     std::array<float, 4> energyDeposited = {};
+    std::array<float, 9> trackerEnergyDeposited = {};
     std::array<float, 4> hitTime = {};
     std::array<float, 4> checkpointTruthTime = {};
     std::array<float, 4> pathLength = {};
+    std::array<std::array<float, 3>, 4> tofPosition = {};
+    std::array<std::array<float, 3>, 9> trackerPosition = {};
 };
 
 enum class GlobalZetaTarget

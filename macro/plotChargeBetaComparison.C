@@ -1,6 +1,8 @@
 #include <TCanvas.h>
+#include <TColor.h>
 #include <TFile.h>
 #include <TF1.h>
+#include <TFitResult.h>
 #include <TGraphErrors.h>
 #include <TH1D.h>
 #include <TLegend.h>
@@ -45,9 +47,9 @@ struct ChargeResult
 };
 
 bool fitCore(TH1D *hist, double &mean, double &meanError,
-             double &sigma, double &sigmaError)
+             double &sigma, double &sigmaError, int minimumEntries)
 {
-    if (!hist || hist->GetEntries() < 300)
+    if (!hist || hist->GetEntries() < minimumEntries)
         return false;
 
     const double probabilities[3] = {0.25, 0.50, 0.75};
@@ -77,7 +79,7 @@ bool fitCore(TH1D *hist, double &mean, double &meanError,
            std::isfinite(sigma) && std::isfinite(sigmaError);
 }
 
-ChargeResult analyzeCharge(const char *fileName, int charge)
+ChargeResult analyzeCharge(const char *fileName, int charge, int minimumEntries)
 {
     ChargeResult output;
     output.charge = charge;
@@ -144,7 +146,8 @@ ChargeResult analyzeCharge(const char *fileName, int charge)
             double meanError = 0;
             double sigma = 0;
             double sigmaError = 0;
-            if (!fitCore(histograms[method][bin], mean, meanError, sigma, sigmaError))
+            if (!fitCore(histograms[method][bin], mean, meanError, sigma, sigmaError,
+                         minimumEntries))
                 continue;
 
             series.beta.push_back(output.betaMin + (bin + 0.5) * betaWidth);
@@ -207,19 +210,19 @@ void plotChargeBetaComparison(
     const char *z2File = "results/11.root",
     const char *z6File = "results/12.root",
     const char *z8File = "results/13.root",
-    const char *outputName = nullptr)
+    const char *outputName = nullptr,
+    int minimumEntries = 300)
 {
     gROOT->SetBatch(true);
     gROOT->SetStyle("Pub");
     gROOT->ForceStyle();
     gStyle->SetOptStat(0);
     gStyle->SetEndErrorSize(4);
-
     const std::array<const char *, 3> files = {z2File, z6File, z8File};
     const std::array<int, 3> charges = {2, 6, 8};
     std::array<ChargeResult, 3> results;
     for (int index = 0; index < 3; ++index)
-        results[index] = analyzeCharge(files[index], charges[index]);
+        results[index] = analyzeCharge(files[index], charges[index], minimumEntries);
 
     TString resolvedOutput = BetaFitterMacro::output_path(
         outputName, "beta_comparison", "charge_beta_center_comparison.pdf");
@@ -303,4 +306,112 @@ void plotChargeBetaComparison(
     canvas.SaveAs(resolvedOutput);
     canvas.SaveAs(pngOutput);
     std::cout << "Saved comparison to " << resolvedOutput << " and " << pngOutput << std::endl;
+}
+
+void plotTrackerEnergyLossComparison(
+    const char *oldZ6File = "results/12.root",
+    const char *oldZ8File = "results/13.root",
+    const char *trackerZ6File = "results/tk_edep_20260731/beta_C12_tracker.root",
+    const char *trackerZ8File = "results/tk_edep_20260731/beta_O16_tracker.root",
+    const char *outputName = nullptr,
+    int trackerMinimumEntries = 20)
+{
+    gROOT->SetBatch(true);
+    gROOT->SetStyle("Pub");
+    gROOT->ForceStyle();
+    gStyle->SetOptStat(0);
+    gStyle->SetEndErrorSize(4);
+
+    const std::array<const char *, 2> oldFiles = {oldZ6File, oldZ8File};
+    const std::array<const char *, 2> trackerFiles = {trackerZ6File, trackerZ8File};
+    const std::array<int, 2> charges = {6, 8};
+    std::array<ChargeResult, 2> results;
+    for (int index = 0; index < 2; ++index)
+    {
+        const ChargeResult oldResult = analyzeCharge(oldFiles[index], charges[index], 300);
+        const ChargeResult trackerResult =
+            analyzeCharge(trackerFiles[index], charges[index], trackerMinimumEntries);
+        results[index] = trackerResult;
+        results[index].betaMin = std::min(oldResult.betaMin, trackerResult.betaMin);
+        results[index].betaMax = std::max(oldResult.betaMax, trackerResult.betaMax);
+        results[index].methods[0] = trackerResult.methods[0];
+        results[index].methods[1] = oldResult.methods[0];
+    }
+
+    TString resolvedOutput = BetaFitterMacro::output_path(
+        outputName, "beta_comparison", "tracker_energy_loss_beta_comparison.pdf");
+    TString pngOutput = resolvedOutput;
+    if (pngOutput.EndsWith(".pdf"))
+        pngOutput.ReplaceAll(".pdf", ".png");
+    else
+        pngOutput += ".png";
+
+    const int trackerColor = TColor::GetColor("#45364B");
+    const int oldColor = TColor::GetColor("#C45B46");
+    TCanvas canvas("trackerEnergyLossComparison", "", 1100, 860);
+    canvas.Divide(2, 2, 0.002, 0.002);
+    for (int chargeIndex = 0; chargeIndex < 2; ++chargeIndex)
+    {
+        const ChargeResult &result = results[chargeIndex];
+        for (int row = 0; row < 2; ++row)
+        {
+            canvas.cd(row * 2 + chargeIndex + 1);
+            gPad->SetLeftMargin(chargeIndex == 0 ? 0.16 : 0.12);
+            gPad->SetRightMargin(0.035);
+            gPad->SetBottomMargin(row == 1 ? 0.15 : 0.11);
+            gPad->SetTopMargin(row == 0 ? 0.12 : 0.06);
+            gPad->SetGridx();
+            gPad->SetGridy();
+
+            const bool sigma = row == 1;
+            const std::pair<double, double> range = graphRange(result, sigma);
+            TH1F *frame = gPad->DrawFrame(result.betaMin, range.first,
+                                          result.betaMax, range.second);
+            frame->GetXaxis()->SetTitle("#beta_{MC} at AMS center");
+            frame->GetYaxis()->SetTitle(sigma ? "Core #sigma(1/#beta residual)"
+                                               : "Core #mu(1/#beta residual)");
+            frame->GetXaxis()->SetTitleSize(0.052);
+            frame->GetYaxis()->SetTitleSize(0.052);
+            frame->GetXaxis()->SetLabelSize(0.043);
+            frame->GetYaxis()->SetLabelSize(0.043);
+            frame->GetYaxis()->SetTitleOffset(chargeIndex == 0 ? 1.45 : 1.20);
+
+            if (!sigma)
+            {
+                TLine zero(result.betaMin, 0, result.betaMax, 0);
+                zero.SetLineColor(TColor::GetColor("#788AA3"));
+                zero.SetLineStyle(2);
+                zero.SetLineWidth(2);
+                zero.Draw("SAME");
+            }
+
+            TGraphErrors *tracker = makeGraph(result.methods[0], sigma, trackerColor, 20);
+            TGraphErrors *old = makeGraph(result.methods[1], sigma, oldColor, 21);
+            tracker->Draw("LP SAME");
+            old->Draw("LP SAME");
+
+            if (row == 0)
+            {
+                TLatex chargeLabel;
+                chargeLabel.SetNDC();
+                chargeLabel.SetTextFont(42);
+                chargeLabel.SetTextSize(0.060);
+                chargeLabel.SetTextAlign(22);
+                chargeLabel.DrawLatex(0.52, 0.94, Form("Z = %d", result.charge));
+            }
+            if (row == 0 && chargeIndex == 0)
+            {
+                TLegend *legend = new TLegend(0.52, 0.67, 0.92, 0.84);
+                legend->SetBorderSize(0);
+                legend->SetFillStyle(0);
+                legend->SetTextSize(0.040);
+                legend->AddEntry(tracker, "Tracker-layer", "lp");
+                legend->AddEntry(old, "Old constant-#beta", "lp");
+                legend->Draw();
+            }
+        }
+    }
+    canvas.SaveAs(resolvedOutput);
+    canvas.SaveAs(pngOutput);
+    std::cout << "Saved tracker comparison to " << resolvedOutput << " and " << pngOutput << std::endl;
 }

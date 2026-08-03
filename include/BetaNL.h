@@ -1,9 +1,10 @@
 #ifndef __BETANL_H__
 #define __BETANL_H__
 
-#include <vector>
+#include <array>
 #include <cmath>
 #include <memory>
+#include <vector>
 
 enum class EnergyLossScaleMode
 {
@@ -95,6 +96,29 @@ public:
         const float pathLength[nTOF]);
 
     /**
+     * Constructor with TOF and tracker hit information
+     * @param beta Initial beta of the particle
+     * @param mass Mass in GeV/c^2 of the particle
+     * @param energyDeposited Energy deposited at TOF hits in MeV (converted to GeV)
+     * @param hitTime Hit times in ns at TOF hits
+     * @param hitTimeError Hit time errors in ns at TOF hits
+     * @param pathLength Path length in cm at TOF hits
+     * @param tofPosition TOF hit positions in cm
+     * @param trackerEnergyDeposited Tracker-layer energy deposits in MeV (converted to GeV)
+     * @param trackerPosition Tracker hit positions in cm
+     */
+    BetaNLPars(
+        const double beta,
+        const double mass,
+        const float energyDeposited[nTOF],
+        const float hitTime[nTOF],
+        const float hitTimeError[nTOF],
+        const float pathLength[nTOF],
+        const float tofPosition[nTOF][3],
+        const float trackerEnergyDeposited[9],
+        const float trackerPosition[9][3]);
+
+    /**
      * Destructor
      */
     virtual ~BetaNLPars() {};
@@ -150,6 +174,10 @@ private:
     std::vector<double> _hitTime;         // Hit times in ns at TOF hits
     std::vector<double> _hitTimeError;    // Hit time errors in ns at TOF hits
     std::vector<double> _pathLength;      // Path length in cm at TOF hits
+    std::array<std::array<double, 3>, nTOF> _tofPosition = {}; // TOF hit positions in cm
+    std::array<double, 9> _trackerEnergyDeposited = {};         // Tracker deposits in GeV
+    std::array<std::array<double, 3>, 9> _trackerPosition = {}; // Tracker hit positions in cm
+    bool _useTrackerEnergyLoss = false;                         // Use tracker-aware propagation
 
     friend class BetaNL;
 };
