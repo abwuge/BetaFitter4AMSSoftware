@@ -542,10 +542,9 @@ bool Util::saveEnergyLossScale(const std::string &inputFile,
     }
 
     // Create TTree
-    TTree *tree = new TTree("scaleTree", "Per-event TOF and Tracker Energy Loss Scale Fit");
+    TTree *tree = new TTree("scaleTree", "Per-event Common Energy Loss Scale Fit");
 
     float energyLossScale;
-    float trackerEnergyLossScale;
     float timeOffset;
     float chi2;
     int fitStatus;
@@ -555,8 +554,6 @@ bool Util::saveEnergyLossScale(const std::string &inputFile,
     float direction[3];
 
     tree->Branch("energyLossScale", &energyLossScale, "energyLossScale/F");
-    tree->Branch("trackerEnergyLossScale", &trackerEnergyLossScale,
-                 "trackerEnergyLossScale/F");
     tree->Branch("timeOffset", &timeOffset, "timeOffset/F");
     tree->Branch("chi2", &chi2, "chi2/F");
     tree->Branch("fitStatus", &fitStatus, "fitStatus/I");
@@ -617,7 +614,6 @@ bool Util::saveEnergyLossScale(const std::string &inputFile,
             referencePoint)
             .EnergyLossScales(particle.mcBeta);
         energyLossScale = fit.energyLossScale;
-        trackerEnergyLossScale = fit.trackerEnergyLossScale;
         timeOffset = fit.timeOffset;
         chi2 = fit.chi2;
         fitStatus = fit.status;

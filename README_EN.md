@@ -78,15 +78,16 @@ the fifth argument and defaults to `1.0`:
 ./run.sh input.root output.root 0 1.9 1.2 all center
 ```
 
-Option `1` fixes `mcBeta` and jointly fits the TOF zeta, tracker energy-loss
-scale, and common time offset for each MC event:
+Option `1` fixes `mcBeta` and jointly fits one common energy-loss scale applied
+to both TOF and tracker deposits, together with the common time offset for each
+MC event:
 
 ```bash
 ./run.sh input.root per_event_scale.root 1 2 1 all center
 ```
 
-The output `scaleTree` stores `energyLossScale`, `trackerEnergyLossScale`,
-`timeOffset`, `chi2`, `fitStatus`, and `fitValid`, so failed fits remain
+The output `scaleTree` stores `energyLossScale`, `timeOffset`, `chi2`,
+`fitStatus`, and `fitValid`, so failed fits remain
 distinguishable from valid results.
 
 ## Data Analysis

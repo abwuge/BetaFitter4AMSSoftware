@@ -76,7 +76,9 @@ bool fitCore(TH1D *hist, double &mean, double &meanError,
     sigma = std::abs(result->Parameter(2));
     sigmaError = result->ParError(2);
     return std::isfinite(mean) && std::isfinite(meanError) &&
-           std::isfinite(sigma) && std::isfinite(sigmaError);
+           std::isfinite(sigma) && std::isfinite(sigmaError) &&
+           sigma < 0.08 && meanError < 0.02 &&
+           sigmaError < 0.5 * sigma;
 }
 
 ChargeResult analyzeCharge(const char *fileName, int charge, int minimumEntries)

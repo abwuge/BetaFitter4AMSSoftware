@@ -112,7 +112,7 @@ EnergyLossFitResult BetaNL::EnergyLossScales(double mcBeta)
     ROOT::Math::Functor functor(
         [&](const double *params)
         { return scaleChi2(params, mcBeta); },
-        3);
+        2);
     minimizer->SetFunction(functor);
 
     const double scaleRange = 10;
@@ -121,34 +121,26 @@ EnergyLossFitResult BetaNL::EnergyLossScales(double mcBeta)
     const double upperScale = initialScale + scaleRange;
     minimizer->SetLimitedVariable(0, "scale", initialScale, 0.1 * scaleRange, lowerScale, upperScale);
 
-    const double initialTrackerScale = 1;
-    const double lowerTrackerScale = 0;
-    const double upperTrackerScale = 20;
-    minimizer->SetLimitedVariable(1, "trackerScale", initialTrackerScale, 1,
-                                  lowerTrackerScale, upperTrackerScale);
-
     const double timeError = _pars->_hitTimeError[0];
     const double initialTimeOffset = _referencePoint == BetaReferencePoint::AMSCenter
                                          ? (_pars->_hitTime[0] + _pars->_hitTime[3]) / 2
                                          : _pars->_hitTime[0];
     const double lowerTimeOffset = initialTimeOffset - 5 * timeError;
     const double upperTimeOffset = initialTimeOffset + 5 * timeError;
-    minimizer->SetLimitedVariable(2, "timeOffset", initialTimeOffset, 0.1 * timeError, lowerTimeOffset, upperTimeOffset);
+    minimizer->SetLimitedVariable(1, "timeOffset", initialTimeOffset, 0.1 * timeError, lowerTimeOffset, upperTimeOffset);
 
     minimizer->SetMaxFunctionCalls(10000);
     const bool converged = minimizer->Minimize();
 
     _energyLossScale = minimizer->X()[0];
-    _trackerEnergyLossScale = minimizer->X()[1];
-    _timeOffset = minimizer->X()[2];
+    _trackerEnergyLossScale = _energyLossScale;
+    _timeOffset = minimizer->X()[1];
     result.status = minimizer->Status();
     result.energyLossScale = _energyLossScale;
-    result.trackerEnergyLossScale = _trackerEnergyLossScale;
     result.timeOffset = _timeOffset;
     result.chi2 = minimizer->MinValue();
     result.valid = converged && result.status == 0 &&
                    std::isfinite(result.energyLossScale) &&
-                   std::isfinite(result.trackerEnergyLossScale) &&
                    std::isfinite(result.timeOffset) && std::isfinite(result.chi2);
     return result;
 }
@@ -374,15 +366,15 @@ double BetaNL::betaChi2(const double *params)
 }
 
 /**
- * @param params[0] Energy loss scale factor
+ * @param params[0] Common TOF and tracker energy loss scale factor
  * @param params[1] Time offset
  * @param mcBeta Monte Carlo beta value
  */
 double BetaNL::scaleChi2(const double *params, const double mcBeta)
 {
     _energyLossScale = params[0];
-    _trackerEnergyLossScale = params[1];
-    _timeOffset = params[2];
+    _trackerEnergyLossScale = params[0];
+    _timeOffset = params[1];
 
     const auto &hitTimeReconstructed = propagate(mcBeta);
     const auto &hitTimeMeasured = _pars->_hitTime.data();

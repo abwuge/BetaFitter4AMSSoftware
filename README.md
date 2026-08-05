@@ -80,13 +80,13 @@ TOF 能损和 tracker 能损使用独立的缩放参数；tracker 缩放默认�
 ./run_local.sh 2 0 1.9 1.0 100 all center
 ```
 
-选项 `1` 在每个 MC 事件上固定 `mcBeta`，同时拟合 TOF zeta、tracker 能损缩放和公共时间零点：
+选项 `1` 在每个 MC 事件上固定 `mcBeta`，同时拟合一个作用于 TOF 与 tracker 的共同能损缩放和公共时间零点：
 
 ```bash
 ./run.sh input.root per_event_scale.root 1 2 1 all center
 ```
 
-输出 `scaleTree` 保存 `energyLossScale`、`trackerEnergyLossScale`、`timeOffset`、`chi2`、`fitStatus` 和 `fitValid`，未收敛事件不会再与有效结果混在一起。
+输出 `scaleTree` 保存 `energyLossScale`、`timeOffset`、`chi2`、`fitStatus` 和 `fitValid`，未收敛事件不会再与有效结果混在一起。
 
 三种作用范围的物理解释、Z2/Z6/Z8 验证结果和使用建议见
 [zeta 作用范围验证结论](docs/energy-loss-scale-scope.md)。

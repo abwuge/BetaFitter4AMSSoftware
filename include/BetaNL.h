@@ -24,7 +24,6 @@ struct EnergyLossFitResult
     bool valid = false;
     int status = -1;
     double energyLossScale = 2;
-    double trackerEnergyLossScale = 1;
     double timeOffset = 0;
     double chi2 = 0;
 };
