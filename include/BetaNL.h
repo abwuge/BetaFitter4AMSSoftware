@@ -19,6 +19,16 @@ enum class BetaReferencePoint
     BeforeTOF
 };
 
+struct EnergyLossFitResult
+{
+    bool valid = false;
+    int status = -1;
+    double energyLossScale = 2;
+    double trackerEnergyLossScale = 1;
+    double timeOffset = 0;
+    double chi2 = 0;
+};
+
 /**
  * @class BetaNLPars
  * @brief Parameters for the beta non-linear reconstruction
@@ -244,14 +254,12 @@ public:
     // ---------------------------------------------------------------------------
 
     /**
-     * Use Monte Carlo beta to calculate energy loss correction scale factor
+     * Use Monte Carlo beta to fit TOF and tracker energy loss scale factors
      * @param mcBeta Monte Carlo beta value
-     * @return Energy loss scale factor
-     * @note Energy loss scale factor is a parameter to adjust the energy loss using in the reconstruction.
-     *       It works extremely wonderful for reducing system errors and improving resolution.
-     * @warning Energy loss scale factor is based on correct Monte Carlo beta value.
+     * @return Fit parameters, chi-square, and convergence status
+     * @warning The fitted scales depend on the Monte Carlo beta value.
      */
-    double EnergyLossScale(double mcBeta);
+    EnergyLossFitResult EnergyLossScales(double mcBeta);
 
 private:
     std::vector<double> propagate(double beta) const;            // Propagate the particle with given beta

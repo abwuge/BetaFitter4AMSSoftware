@@ -1,6 +1,6 @@
 universe     = vanilla
 executable   = /home/ams/hxwu/AMSSoft/betaFitter/run.sh
-arguments    = $(inputfile) /home/ams/hxwu/AMSSoft/betaFitter/results/$(Cluster)_$(Process).root $(fitOption) $(arg4) $(arg5) $(arg6) $(arg7) $(arg8) $(arg9) $(arg10)
+arguments    = $(inputfile) /home/ams/hxwu/AMSSoft/betaFitter/results/$(Cluster)_$(Process).root $(fitOption) $(arg4) $(arg5) $(arg6) $(arg7)
 
 request_cpus = 1
 

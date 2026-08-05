@@ -98,14 +98,21 @@ void BetaNLPars::init()
         edep *= 1e-3;
 }
 
-double BetaNL::EnergyLossScale(double mcBeta)
+EnergyLossFitResult BetaNL::EnergyLossScales(double mcBeta)
 {
-    ROOT::Math::Minimizer *minimizer = ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad");
+    EnergyLossFitResult result;
+    if (!_pars->_useTrackerEnergyLoss)
+        return result;
+
+    std::unique_ptr<ROOT::Math::Minimizer> minimizer(
+        ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
+    if (!minimizer)
+        return result;
 
     ROOT::Math::Functor functor(
         [&](const double *params)
         { return scaleChi2(params, mcBeta); },
-        2);
+        3);
     minimizer->SetFunction(functor);
 
     const double scaleRange = 10;
@@ -114,17 +121,36 @@ double BetaNL::EnergyLossScale(double mcBeta)
     const double upperScale = initialScale + scaleRange;
     minimizer->SetLimitedVariable(0, "scale", initialScale, 0.1 * scaleRange, lowerScale, upperScale);
 
+    const double initialTrackerScale = 1;
+    const double lowerTrackerScale = 0;
+    const double upperTrackerScale = 20;
+    minimizer->SetLimitedVariable(1, "trackerScale", initialTrackerScale, 1,
+                                  lowerTrackerScale, upperTrackerScale);
+
     const double timeError = _pars->_hitTimeError[0];
     const double initialTimeOffset = _referencePoint == BetaReferencePoint::AMSCenter
                                          ? (_pars->_hitTime[0] + _pars->_hitTime[3]) / 2
                                          : _pars->_hitTime[0];
     const double lowerTimeOffset = initialTimeOffset - 5 * timeError;
     const double upperTimeOffset = initialTimeOffset + 5 * timeError;
-    minimizer->SetLimitedVariable(1, "timeOffset", initialTimeOffset, 0.1 * timeError, lowerTimeOffset, upperTimeOffset);
+    minimizer->SetLimitedVariable(2, "timeOffset", initialTimeOffset, 0.1 * timeError, lowerTimeOffset, upperTimeOffset);
 
-    minimizer->Minimize();
+    minimizer->SetMaxFunctionCalls(10000);
+    const bool converged = minimizer->Minimize();
 
-    return _energyLossScale = minimizer->X()[0];
+    _energyLossScale = minimizer->X()[0];
+    _trackerEnergyLossScale = minimizer->X()[1];
+    _timeOffset = minimizer->X()[2];
+    result.status = minimizer->Status();
+    result.energyLossScale = _energyLossScale;
+    result.trackerEnergyLossScale = _trackerEnergyLossScale;
+    result.timeOffset = _timeOffset;
+    result.chi2 = minimizer->MinValue();
+    result.valid = converged && result.status == 0 &&
+                   std::isfinite(result.energyLossScale) &&
+                   std::isfinite(result.trackerEnergyLossScale) &&
+                   std::isfinite(result.timeOffset) && std::isfinite(result.chi2);
+    return result;
 }
 
 /**
@@ -322,7 +348,8 @@ std::vector<double> BetaNL::propagate(double beta) const
 
 /**
  * @param params[0] Inverse beta (1/beta)
- * @param params[1] Time offset
+ * @param params[1] Tracker energy loss scale factor
+ * @param params[2] Time offset
  */
 double BetaNL::betaChi2(const double *params)
 {
@@ -354,7 +381,8 @@ double BetaNL::betaChi2(const double *params)
 double BetaNL::scaleChi2(const double *params, const double mcBeta)
 {
     _energyLossScale = params[0];
-    _timeOffset = params[1];
+    _trackerEnergyLossScale = params[1];
+    _timeOffset = params[2];
 
     const auto &hitTimeReconstructed = propagate(mcBeta);
     const auto &hitTimeMeasured = _pars->_hitTime.data();

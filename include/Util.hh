@@ -44,7 +44,7 @@ namespace Util
      * @param inputFile Path to the ROOT file containing particle data
      * @param outputFile Path to save the ROOT file containing fit results
      * @param energyLossScale Scale factor applied to selected TOF energy losses
-     * Fits the TOF and tracker energy-loss scales simultaneously.
+     * @param trackerEnergyLossScale Scale factor applied to tracker energy losses
      * @return bool True if fit succeeds, false otherwise
      */
     bool saveBeta(const std::string &inputFile,
@@ -72,33 +72,16 @@ namespace Util
     bool saveEnergyLoss(const std::string &inputFile, const std::string &outputFile);
 
     /**
-     * @brief Calculate energy loss scale factor
+     * @brief Fit per-event TOF and tracker energy loss scale factors
      *
      * @param inputFile Path to the ROOT file containing particle data
      * @param outputFile Path to save the ROOT file containing energy loss scale factor
-     * @return bool True if calculation succeeds, false otherwise
+     * @return bool True if the output is written, false otherwise
      */
     bool saveEnergyLossScale(const std::string &inputFile,
                              const std::string &outputFile,
                              EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All,
                              BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter);
-
-    /**
-     * @brief Fit one energy-loss scale shared by all selected MC events
-     *
-     * The input may be one ROOT file or a text file containing one ROOT path per line.
-     * Each event's common time offset is profiled out analytically.
-     * @param trackerEnergyLossScale Scale factor applied to tracker energy losses
-     */
-    bool saveGlobalEnergyLossScale(const std::string &inputFile,
-                                   const std::string &outputFile,
-                                   double betaMax = 0.9,
-                                   double zetaMin = 0.0,
-                                   double zetaMax = 6.0,
-                                   EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All,
-                                   BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter,
-                                   double trackerScaleMin = 0.0,
-                                   double trackerScaleMax = 20.0);
 
     /**
      * @brief Benchmark BetaNL::Beta() function average CPU time

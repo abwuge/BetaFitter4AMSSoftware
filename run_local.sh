@@ -3,21 +3,11 @@
 # Default maximum number of parallel processes
 Z=${1:-8}
 fitOption=${2:-0}
-if [[ "$fitOption" == "4" ]]; then
-    betaMax=${3:-0.9}
-    energyLossScaleMode=${4:-all}
-    referencePoint=${5:-center}
-    globalZetaMin=${6:-0}
-    globalZetaMax=${7:-6}
-    trackerScaleMin=${8:-0}
-    trackerScaleMax=${9:-20}
-else
-    energyLossScale=${3:-1.0}
-    trackerEnergyLossScale=${4:-1.0}
-    MAX_PROCS=${5:-100}
-    energyLossScaleMode=${6:-all}
-    referencePoint=${7:-center}
-fi
+energyLossScale=${3:-1.0}
+trackerEnergyLossScale=${4:-1.0}
+MAX_PROCS=${5:-100}
+energyLossScaleMode=${6:-all}
+referencePoint=${7:-center}
 
 # Array to store child PIDs
 declare -a CHILD_PIDS
@@ -60,22 +50,6 @@ get_next_run_num() {
     echo "$i"
 }
 RUN_NUM=$(get_next_run_num)
-
-if [[ "$fitOption" == "4" ]]; then
-    output_file="${RESULTS_DIR}/${RUN_NUM}.root"
-    log_file="${LOGS_DIR}/${RUN_NUM}.log"
-    "${SCRIPT_DIR}/run.sh" "$INPUT_LIST" "$output_file" "$fitOption" \
-        "$betaMax" "$energyLossScaleMode" "$referencePoint" "$globalZetaMin" \
-        "$globalZetaMax" "$trackerScaleMin" "$trackerScaleMax" > "$log_file" 2>&1
-    TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
-    README_FILE="${RESULTS_DIR}/README.md"
-    if [[ ! -f "$README_FILE" ]]; then
-        echo "# Running Parameters Log" > "$README_FILE"
-    fi
-    echo "[${TIMESTAMP}] FILE = ${RUN_NUM}.root: Z = ${Z}, fitOption = ${fitOption}, betaMax = ${betaMax}, energyLossScaleMode = ${energyLossScaleMode}, referencePoint = ${referencePoint}, zetaRange = [${globalZetaMin}, ${globalZetaMax}], trackerScaleRange = [${trackerScaleMin}, ${trackerScaleMax}]" >> "$README_FILE"
-    echo "Global joint scale fit saved to ${output_file}"
-    exit 0
-fi
 
 # Process each input file
 counter=0

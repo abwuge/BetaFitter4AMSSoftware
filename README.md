@@ -80,17 +80,13 @@ TOF 能损和 tracker 能损使用独立的缩放参数；tracker 缩放默认�
 ./run_local.sh 2 0 1.9 1.0 100 all center
 ```
 
-### TOF/tracker 联合拟合
-
-选项 `4` 在所有选中的 MC 事件上同时拟合 TOF 的 `zeta` 与 tracker 能损缩放。两个参数进入同一个总 χ²，每个事件的公共时间零点会被解析消去。输入既可以是单个 ROOT 文件，也可以是每行一个 ROOT 路径的 `.list` 文件：
+选项 `1` 在每个 MC 事件上固定 `mcBeta`，同时拟合 TOF zeta、tracker 能损缩放和公共时间零点：
 
 ```bash
-./run.sh input_Z2.list global_scale_Z2.root 4 0.9 all center 0 6 0 20
+./run.sh input.root per_event_scale.root 1 2 1 all center
 ```
 
-其中 `0.9` 是 MC beta 上限，`0 6` 是 zeta 范围，`0 20` 是 tracker scale 范围。拟合在整个二维参数边界上使用同一批 checkpoint 可积分事件，同时给出 measured-time 和 checkpoint-truth 两个结果。输出包含单条目的 `globalScaleTree`，以及穿过联合最优点的 `globalScaleProfile` 和 `globalTrackerScaleProfile` 两条 41 点 χ² 切片。中心模式与普通 beta 重建使用相同的参考点传播定义。
-
-该入口将 [`research/zeta_study_20260722`](research/zeta_study_20260722/README.md) 的全局 profile 方法纳入主程序，并扩展到可选的 AMS 中心参考点。
+输出 `scaleTree` 保存 `energyLossScale`、`trackerEnergyLossScale`、`timeOffset`、`chi2`、`fitStatus` 和 `fitValid`，未收敛事件不会再与有效结果混在一起。
 
 三种作用范围的物理解释、Z2/Z6/Z8 验证结果和使用建议见
 [zeta 作用范围验证结论](docs/energy-loss-scale-scope.md)。

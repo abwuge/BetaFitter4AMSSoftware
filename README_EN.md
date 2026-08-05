@@ -78,17 +78,16 @@ the fifth argument and defaults to `1.0`:
 ./run.sh input.root output.root 0 1.9 1.2 all center
 ```
 
-### Joint TOF/tracker scale fit
-
-Option `4` jointly fits one TOF zeta and one tracker energy-loss scale shared by all selected MC events. Each event's common time offset is profiled out analytically; the implementation does not fit per-event scales and then average them. The input may be one ROOT file or a `.list` file containing one ROOT path per line:
+Option `1` fixes `mcBeta` and jointly fits the TOF zeta, tracker energy-loss
+scale, and common time offset for each MC event:
 
 ```bash
-./run.sh input_Z2.list global_scale_Z2.root 4 0.9 all center 0 6 0 20
+./run.sh input.root per_event_scale.root 1 2 1 all center
 ```
 
-Here `0.9` is the MC beta upper limit, `0 6` is the zeta range, and `0 20` is the tracker-scale range. The two scales are minimized together on one event sample that remains valid across the full parameter box. The fit reports measured-time and checkpoint-truth results in `globalScaleTree`, plus 41-point zeta and tracker-scale chi-square slices through the joint optima.
-
-This entry point promotes the global-profile method from [`research/zeta_study_20260722`](research/zeta_study_20260722/README.md) into the main program and extends it to the selectable AMS-center reference point.
+The output `scaleTree` stores `energyLossScale`, `trackerEnergyLossScale`,
+`timeOffset`, `chi2`, `fitStatus`, and `fitValid`, so failed fits remain
+distinguishable from valid results.
 
 ## Data Analysis
 

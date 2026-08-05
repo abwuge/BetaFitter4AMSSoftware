@@ -156,6 +156,7 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     double mcBetaMin = tree->GetMinimum("mcBeta");
     double mcBetaMax = tree->GetMaximum("mcBeta");
     const double mcBetaSelectionMax = 0.9;
+    const TString validSelection = tree->GetBranch("fitValid") ? "fitValid==1" : "1";
 
     // Number of bins for histograms
     int nBins = 200;
@@ -204,7 +205,8 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     canvas1->SetRightMargin(0.11);
     canvas1->SetGridx();
     canvas1->SetGridy();
-    tree->Draw("energyLossScale>>hEnergyLossScale", Form("mcBeta < %.1f", mcBetaSelectionMax));
+    tree->Draw("energyLossScale>>hEnergyLossScale",
+               Form("(%s) && mcBeta < %.1f", validSelection.Data(), mcBetaSelectionMax));
     hEnergyLossScale->SetLineColor(kBlue);
     hEnergyLossScale->SetLineWidth(2);
     hEnergyLossScale->SetFillColor(kBlue - 10);
@@ -240,7 +242,7 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     canvas2->SetGridy();
     canvas2->SetLogz();
 
-    tree->Draw("energyLossScale:mcBeta>>hScaleVsBeta");
+    tree->Draw("energyLossScale:mcBeta>>hScaleVsBeta", validSelection);
     hScaleVsBeta->Draw("COLZ");
 
     std::vector<double> betaValues, scaleMean, scaleError;
@@ -292,7 +294,8 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     canvas3->SetGridy();
     canvas3->SetLogz();
 
-    tree->Draw("energyLossScale:TMath::ATan2(direction[0], direction[2])>>hScaleVsXZAngle", "mcBeta < 0.9");
+    tree->Draw("energyLossScale:TMath::ATan2(direction[0], direction[2])>>hScaleVsXZAngle",
+               Form("(%s) && mcBeta < 0.9", validSelection.Data()));
     hScaleVsXZAngle->Draw("COLZ");
 
     // Prepare for profile analysis - XZ Angle
@@ -367,7 +370,8 @@ void plotEnergyLossScale(std::string fileName = "test.root",
     canvas4->SetGridy();
     canvas4->SetLogz();
 
-    tree->Draw("energyLossScale:TMath::ATan2(direction[1], direction[2])>>hScaleVsYZAngle", "mcBeta < 0.9");
+    tree->Draw("energyLossScale:TMath::ATan2(direction[1], direction[2])>>hScaleVsYZAngle",
+               Form("(%s) && mcBeta < 0.9", validSelection.Data()));
     hScaleVsYZAngle->Draw("COLZ");
 
     // Prepare for profile analysis - YZ Angle
