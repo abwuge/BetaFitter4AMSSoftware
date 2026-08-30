@@ -18,14 +18,12 @@
 namespace Util
 {
     /**
-     * @brief Get particle mass from PDG ID
+     * @brief Get the isotope-abundance-weighted mass for a reconstructed charge
      *
-     * Supports Geant3 particle IDs and Geant4 PDG IDs if no Geant3 counterpart is found
-     *
-     * @param pdgId Geant3 particle ID or Geant4 PDG ID
-     * @return float Mass in GeV/c^2, 0 if particle not recognized
+     * @param charge Reconstructed nuclear charge Z
+     * @return float Average mass in GeV/c^2, 0 for unsupported charges
      */
-    float getMass(int pdgId, double charge);
+    float getAverageMass(int charge);
 
     /**
      * @brief Load particle data from amstreea in ROOT file

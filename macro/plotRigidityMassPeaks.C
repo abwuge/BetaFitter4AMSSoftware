@@ -96,7 +96,7 @@ void styleHistogram(TH1D *hist, Color_t color, int lineStyle)
 
 void plotRigidityMassPeaks(
     const char *inputName = "results/14.root",
-    const char *outputDirectory = "macro/results/data_p000-009",
+    const char *outputDirectory = "macro/results/data_amsd69n",
     double rigidityMin = 1.0,
     double rigidityMax = 3.0)
 {

@@ -18,16 +18,28 @@
 #include <TText.h>
 #include <chrono>
 
-// Implementation of getMass function
-float Util::getMass(int pdgId, double charge)
+float Util::getAverageMass(int charge)
 {
-    switch (pdgId)
-    {
-    case 69: // O16
-        return 14.899169;
-    default:
-        return 2 * charge * 0.9314941; // Suppose its' number of neutron equals to number of proton
-    }
+    // Fixed isotope mixtures used by the AMS analysis. Values are average
+    // atomic masses in u; multiplying by u converts them to GeV/c^2.
+    static const double averageAtomicMassU[] = {
+        0.0,
+        1.00782500,  // Z=1:  100% 1H
+        3.90394781,  // Z=2:   10% 3He + 90% 4He
+        6.51556315,  // Z=3:   50% 6Li + 50% 7Li
+        7.91516552,  // Z=4:   60% 7Be + 30% 9Be + 10% 10Be
+        10.71039495, // Z=5:   30% 10B + 70% 11B
+        12.10033548, // Z=6:   90% 12C + 10% 13C
+        14.50159145, // Z=7:   50% 14N + 50% 15N
+        15.99491460, // Z=8:  100% 16O
+        18.99840320, // Z=9:  100% 19F
+        20.79201832  // Z=10: 60% 20Ne + 40% 22Ne
+    };
+    static const double atomicMassUnitGeV = 0.9314941;
+    const int maximumCharge = sizeof(averageAtomicMassU) / sizeof(averageAtomicMassU[0]) - 1;
+    if (charge < 1 || charge > maximumCharge)
+        return 0;
+    return averageAtomicMassU[charge] * atomicMassUnitGeV;
 }
 
 std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
@@ -56,6 +68,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
     bool isMC{};
     int mpar{};
     float mch{};
+    float mmass{};
     float mevcoo1[21][3]{};
     float mevdir1[21][3]{};
     float mevmom1[21]{};
@@ -68,15 +81,23 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
     float tk_edep[9]{};
     float tk_q[2]{};
     float tk_qin[2][3]{};
-    float tk_rigidity1[3][3][7]{};
+    float tk_rigidity{};
     float tof_leng[4]{};
 
     // Set branch addresses
     if (tree->GetBranch("mpar"))
     {
+        if (!tree->GetBranch("mmass"))
+        {
+            std::cerr << "Error: Missing required MC truth mmass branch in "
+                      << inputFile << std::endl;
+            file->Close();
+            return particles;
+        }
         isMC = true;
         tree->SetBranchAddress("mpar", &mpar);
         tree->SetBranchAddress("mch", &mch);
+        tree->SetBranchAddress("mmass", &mmass);
         tree->SetBranchAddress("mevcoo1", mevcoo1);
         tree->SetBranchAddress("mevdir1", mevdir1);
         tree->SetBranchAddress("mevmom1", mevmom1);
@@ -96,7 +117,14 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
     tree->SetBranchAddress("tk_edep", tk_edep);
     tree->SetBranchAddress("tk_q", tk_q);
     tree->SetBranchAddress("tk_qin", tk_qin);
-    tree->SetBranchAddress("tk_rigidity1", tk_rigidity1);
+    if (!tree->GetBranch("tk_rigidity"))
+    {
+        std::cerr << "Error: Missing required amsd69n tk_rigidity branch in "
+                  << inputFile << std::endl;
+        file->Close();
+        return particles;
+    }
+    tree->SetBranchAddress("tk_rigidity", &tk_rigidity);
     tree->SetBranchAddress("tof_leng", tof_leng);
 
     // Read all entries
@@ -115,7 +143,6 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
             data.isMC = true;
             data.mcGeantId = mpar;
             data.mcCharge = mch;
-            float mmass = getMass(mpar, mch);
             data.mcMass = mmass;
 
             data.mcInitCoo[0] = mevcoo1[mcReferenceIndex][0];
@@ -163,10 +190,10 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
         }
 
         data.charge = (int)((tk_qin[0][2] < 2.5 ? tk_q[1] : tk_qin[0][2]) + 0.5);
-        // Equivalent to TofCalib SelEvent::GetRigidity(0, 1):
-        // GBL, V6, L1+Inner when L1INNERWOCHIS is enabled.
-        data.innerRigidity = tk_rigidity1[1][2][2];
-        data.mass = 2 * data.charge * 0.9314941; // Suppose its' number of neutron equals to number of proton
+        data.innerRigidity = tk_rigidity;
+        data.mass = getAverageMass(data.charge);
+        if (!(data.mass > 0))
+            continue;
         data.betaLinear = tof_betah;
         float momentumRigidity = data.innerRigidity * data.charge;
         data.betaRigidity = momentumRigidity / TMath::Sqrt(momentumRigidity * momentumRigidity + data.mass * data.mass);
@@ -454,6 +481,7 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
     int tof_qs = 0; // Q Status (1111: all unoverlapped, 0000: all overlapped, left to right: S1, S2, S3, S4)
     int mpar = 0;
     float mch = 0.0f;
+    float mmass = 0.0f;
     float mevmom1[21]{};
     float tof_edep[4]{};
     float mevcoo1[21][3]{};
@@ -462,6 +490,13 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
     treeIn->SetBranchAddress("tof_qs", &tof_qs);
     treeIn->SetBranchAddress("mpar", &mpar);
     treeIn->SetBranchAddress("mch", &mch);
+    if (!treeIn->GetBranch("mmass"))
+    {
+        std::cerr << "Error: Missing required MC truth mmass branch in " << inputFile << std::endl;
+        fileIn->Close();
+        return false;
+    }
+    treeIn->SetBranchAddress("mmass", &mmass);
     treeIn->SetBranchAddress("mevmom1", mevmom1);
     treeIn->SetBranchAddress("tof_edep", tof_edep);
     treeIn->SetBranchAddress("mevcoo1", mevcoo1);
@@ -514,7 +549,7 @@ bool Util::saveEnergyLoss(const std::string &inputFile, const std::string &outpu
         if (mevmom1[4] == -1000 || mevmom1[6] == -1000 || mevmom1[7] == -1000 || mevmom1[15] == -1000 || mevmom1[14] == -1000 || mevmom1[17] == -1000)
             continue;
 
-        double mass = getMass(mpar, mch);
+        double mass = mmass;
 
         /**
          * Kinetic energy index - z-position:
@@ -784,6 +819,7 @@ bool Util::saveBetaDiff(const std::string &inputFile,
     }
 
     float tof_betah{};
+    float mmass{};
     float mevmom1[21]{};
     float mevcoo1[21][3]{};
     float tk_q[2]{};
@@ -794,6 +830,13 @@ bool Util::saveBetaDiff(const std::string &inputFile,
     float tof_leng[4]{};
 
     treeIn->SetBranchAddress("tof_betah", &tof_betah);
+    if (!treeIn->GetBranch("mmass"))
+    {
+        std::cerr << "Error: Missing required MC truth mmass branch in " << inputFile << std::endl;
+        fileIn->Close();
+        return false;
+    }
+    treeIn->SetBranchAddress("mmass", &mmass);
     treeIn->SetBranchAddress("mevmom1", mevmom1);
     treeIn->SetBranchAddress("mevcoo1", mevcoo1);
     treeIn->SetBranchAddress("tk_q", tk_q);
@@ -829,7 +872,9 @@ bool Util::saveBetaDiff(const std::string &inputFile,
         treeIn->GetEntry(i);
 
         float charge = (int)((tk_qin[0][2] < 2.5 ? tk_q[1] : tk_qin[0][2]) + 0.5);
-        float mass = 2 * charge * 0.9314941;
+        float mass = getAverageMass(charge);
+        if (!(mass > 0))
+            continue;
 
         linearBeta = tof_betah;
         nonlinearBeta =
@@ -849,7 +894,7 @@ bool Util::saveBetaDiff(const std::string &inputFile,
 
         for (int j = 0; j < 21; ++j)
             if (mevmom1[j] != -1000)
-                mcBeta[j] = mevmom1[j] / sqrt(mevmom1[j] * mevmom1[j] + mass * mass);
+                mcBeta[j] = mevmom1[j] / sqrt(mevmom1[j] * mevmom1[j] + mmass * mmass);
             else
                 mcBeta[j] = -1000;
 

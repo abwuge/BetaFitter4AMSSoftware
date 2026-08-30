@@ -422,14 +422,14 @@ void plotResponsibility(const char *diagnosticName,
 
 void diagnoseCenterCommonScale(
     const char *dataFile =
-        "results/data_p000-009_center_common_20260805_z268.root",
+        "results/data_amsd69n_center_common_20260805_z268.root",
     const char *mcDirectory =
         "results/energy_loss_scale_20260805/beta_at_common_scale",
     const char *outputName =
-        "macro/results/data_p000-009_center_common_20260805_z268_lowR/"
+        "macro/results/data_amsd69n_center_common_20260805_z268_lowR/"
         "center_common_mc_diagnostics.tsv",
     const char *massSummaryName =
-        "macro/results/data_p000-009_center_common_20260805_z268_lowR/"
+        "macro/results/data_amsd69n_center_common_20260805_z268_lowR/"
         "rigidity_mass_peaks.tsv",
     double rigidityLow = 0.8,
     double rigidityHigh = 1.4)

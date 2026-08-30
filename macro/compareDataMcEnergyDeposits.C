@@ -187,13 +187,13 @@ void writeSample(std::ofstream &output, const char *sample, int charge,
 
 void compareDataMcEnergyDeposits(
     const char *dataPattern =
-        "/lustre02/user/yachen/public/hxwu/"
-        "newtofcalib_dt_betafitter_p000-009/*_0/*.root",
+        "/lustre02/user/yachen/public/"
+        "amsd69n_B1130_Data_TofCalibN2/*.root",
     const char *mcRoot =
         "/lustre02/user/yachen/public/hxwu/"
         "betaFitter_rdst_amsd69n_B1308_20260731",
     const char *outputName =
-        "macro/results/data_p000-009_center_common_20260805_z268_lowR/"
+        "macro/results/data_amsd69n_center_common_20260805_z268_lowR/"
         "data_mc_edep_summary.tsv")
 {
     std::ofstream output(outputName);
