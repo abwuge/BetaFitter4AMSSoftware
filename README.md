@@ -80,6 +80,13 @@ TOF 能损和 tracker 能损使用独立的缩放参数；tracker 缩放默认�
 ./run_local.sh 2 0 1.9 1.0 100 all center
 ```
 
+按电荷设置生产 scale 时，通过第八个参数传入三列配置文件，三列依次为
+`电荷数`、`TOF scale` 和 `tracker scale`。配置文件中未列出的电荷会被跳过。例如：
+
+```bash
+./run.sh input.root output.root 0 1.0 1.0 all center config/energy_loss_scales_center_common_20260805_z268.conf
+```
+
 选项 `1` 在每个 MC 事件上固定 `mcBeta`，同时拟合一个作用于 TOF 与 tracker 的共同能损缩放和公共时间零点：
 
 ```bash

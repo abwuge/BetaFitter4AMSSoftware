@@ -62,7 +62,7 @@ Or use the local processing script:
 ./run_local.sh
 ```
 
-The final argument selects the beta reconstruction reference point: `center`
+The seventh argument selects the beta reconstruction reference point: `center`
 means the AMS center between S2 and S3 (default), while `before_tof` means the
 point immediately before the particle enters TOF:
 
@@ -76,6 +76,14 @@ the fifth argument and defaults to `1.0`:
 
 ```bash
 ./run.sh input.root output.root 0 1.9 1.2 all center
+```
+
+For charge-dependent production scales, pass a three-column configuration file
+as the eighth argument. The columns are `charge`, `TOF scale`, and
+`tracker scale`; charges absent from the file are skipped. For example:
+
+```bash
+./run.sh input.root output.root 0 1.0 1.0 all center config/energy_loss_scales_center_common_20260805_z268.conf
 ```
 
 Option `1` fixes `mcBeta` and jointly fits one common energy-loss scale applied
