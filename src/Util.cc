@@ -159,7 +159,9 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
         }
 
         data.charge = (int)((tk_qin[0][2] < 2.5 ? tk_q[1] : tk_qin[0][2]) + 0.5);
-        data.innerRigidity = tk_rigidity1[1][2][1];
+        // Equivalent to TofCalib SelEvent::GetRigidity(0, 1):
+        // GBL, V6, L1+Inner when L1INNERWOCHIS is enabled.
+        data.innerRigidity = tk_rigidity1[1][2][2];
         data.mass = 2 * data.charge * 0.9314941; // Suppose its' number of neutron equals to number of proton
         data.betaLinear = tof_betah;
         float momentumRigidity = data.innerRigidity * data.charge;
