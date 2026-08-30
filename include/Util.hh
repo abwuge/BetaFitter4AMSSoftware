@@ -45,6 +45,7 @@ namespace Util
      * @param outputFile Path to save the ROOT file containing fit results
      * @param energyLossScale Scale factor applied to selected TOF energy losses
      * @param trackerEnergyLossScale Scale factor applied to tracker energy losses
+     * @param scaleConfig Optional charge-dependent scale configuration file
      * @return bool True if fit succeeds, false otherwise
      */
     bool saveBeta(const std::string &inputFile,
@@ -52,7 +53,8 @@ namespace Util
                   double energyLossScale = 2,
                   double trackerEnergyLossScale = 1,
                   EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All,
-                  BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter);
+                  BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter,
+                  const std::string &scaleConfig = "none");
 
     /**
      * @brief Save magnetic field information to ROOT file

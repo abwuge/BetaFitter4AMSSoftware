@@ -7,7 +7,7 @@ int main(int argc, char **argv)
 {
     if (argc < 3)
     {
-        std::cout << "Usage: " << argv[0] << " <input.root> <output.root> [<Option>] [<Energy Loss Scale>] [<Tracker Energy Loss Scale>] [<Scale Mode: all|s1s2|s2>] [<Reference Point: center|before_tof>]" << std::endl;
+        std::cout << "Usage: " << argv[0] << " <input.root> <output.root> [<Option>] [<Energy Loss Scale>] [<Tracker Energy Loss Scale>] [<Scale Mode: all|s1s2|s2>] [<Reference Point: center|before_tof>] [<Scale Config: none|path>]" << std::endl;
         std::cout << "Option: " << std::endl;
         std::cout << "  -2: Save energy loss information to ROOT file" << std::endl;
         std::cout << "  -1: Save magnetic field information to ROOT file" << std::endl;
@@ -49,9 +49,12 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    const std::string scaleConfig = argc > 8 ? argv[8] : "none";
+
     std::string info = "\nInput file: " + inputFile + "\nOutput file: " + outputFile + "\nOption: " + std::to_string(Option) +
                        "\nEnergy Loss Scale Mode: " + energyLossScaleModeName +
-                       "\nBeta Reference Point: " + referencePointName + "\n";
+                       "\nBeta Reference Point: " + referencePointName +
+                       "\nScale Config: " + scaleConfig + "\n";
 
     if (Option == 0)
         info += "Energy Loss Scale: " + std::to_string(energyLossScale) +
@@ -68,7 +71,7 @@ int main(int argc, char **argv)
     case 0:
         return Util::saveBeta(inputFile, outputFile, energyLossScale,
                               trackerEnergyLossScale, energyLossScaleMode,
-                              referencePoint)
+                              referencePoint, scaleConfig)
                    ? 0
                    : 1;
     case 1:

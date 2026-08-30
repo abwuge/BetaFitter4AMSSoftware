@@ -8,6 +8,7 @@ trackerEnergyLossScale=${4:-1.0}
 MAX_PROCS=${5:-100}
 energyLossScaleMode=${6:-all}
 referencePoint=${7:-center}
+scaleConfig=${8:-none}
 
 # Array to store child PIDs
 declare -a CHILD_PIDS
@@ -70,7 +71,7 @@ while IFS= read -r input_file; do
     ((counter++))
     
     # Run the process in background
-    ("${SCRIPT_DIR}/run.sh" "$input_file" "$output_file" "$fitOption" "$energyLossScale" "$trackerEnergyLossScale" "$energyLossScaleMode" "$referencePoint" > "$log_file" 2>&1) &
+    (bash "${SCRIPT_DIR}/run.sh" "$input_file" "$output_file" "$fitOption" "$energyLossScale" "$trackerEnergyLossScale" "$energyLossScaleMode" "$referencePoint" "$scaleConfig" > "$log_file" 2>&1) &
     
     # Store the PID of the background process
     CHILD_PIDS+=($!)
@@ -100,7 +101,7 @@ if [ ! -f "$README_FILE" ]; then
 fi
 
 # Append run information to README.md
-echo "[${TIMESTAMP}] FILE = ${HADD_FILE}: Z = ${Z}, fitOption = ${fitOption}, energyLossScale = ${energyLossScale}, trackerEnergyLossScale = ${trackerEnergyLossScale}, energyLossScaleMode = ${energyLossScaleMode}, referencePoint = ${referencePoint}, MAX_PROCS = ${MAX_PROCS}  " >> "$README_FILE"
+echo "[${TIMESTAMP}] FILE = ${HADD_FILE}: Z = ${Z}, fitOption = ${fitOption}, energyLossScale = ${energyLossScale}, trackerEnergyLossScale = ${trackerEnergyLossScale}, energyLossScaleMode = ${energyLossScaleMode}, referencePoint = ${referencePoint}, scaleConfig = ${scaleConfig}, MAX_PROCS = ${MAX_PROCS}  " >> "$README_FILE"
 echo "Run information has been added to ${README_FILE}."
 
 echo "All jobs completed!"

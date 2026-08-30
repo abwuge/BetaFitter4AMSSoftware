@@ -3,7 +3,11 @@
 #include "ParticlePropagator.hh"
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <map>
+#include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 #include <TFile.h>
 #include <TTree.h>
@@ -180,8 +184,51 @@ bool Util::saveBeta(const std::string &inputFile,
                     double energyLossScale,
                     double trackerEnergyLossScale,
                     EnergyLossScaleMode energyLossScaleMode,
-                    BetaReferencePoint referencePoint)
+                    BetaReferencePoint referencePoint,
+                    const std::string &scaleConfig)
 {
+    std::map<int, std::pair<double, double>> chargeScales;
+    if (scaleConfig != "none")
+    {
+        std::ifstream config(scaleConfig.c_str());
+        if (!config)
+        {
+            std::cerr << "Error: Could not open scale configuration " << scaleConfig << std::endl;
+            return false;
+        }
+
+        std::string line;
+        int lineNumber = 0;
+        while (std::getline(config, line))
+        {
+            ++lineNumber;
+            const std::string::size_type first = line.find_first_not_of(" \t\r");
+            if (first == std::string::npos || line[first] == '#')
+                continue;
+
+            int charge;
+            double tofScale;
+            double trackerScale;
+            std::string extra;
+            std::istringstream values(line);
+            if (!(values >> charge >> tofScale >> trackerScale) ||
+                (values >> extra) || charge <= 0 ||
+                !std::isfinite(tofScale) || !std::isfinite(trackerScale) ||
+                tofScale <= 0 || trackerScale <= 0 || chargeScales.count(charge))
+            {
+                std::cerr << "Error: Invalid scale configuration at " << scaleConfig
+                          << ":" << lineNumber << std::endl;
+                return false;
+            }
+            chargeScales[charge] = std::make_pair(tofScale, trackerScale);
+        }
+        if (chargeScales.empty())
+        {
+            std::cerr << "Error: No charge scales found in " << scaleConfig << std::endl;
+            return false;
+        }
+    }
+
     // Load particle data from input file
     std::vector<ParticleData> particles =
         Util::loadParticleData(inputFile, referencePoint);
@@ -221,6 +268,17 @@ bool Util::saveBeta(const std::string &inputFile,
     // Process each particle
     for (const auto &particle : particles)
     {
+        double particleTOFScale = energyLossScale;
+        double particleTrackerScale = trackerEnergyLossScale;
+        if (scaleConfig != "none")
+        {
+            const auto scale = chargeScales.find(particle.charge);
+            if (scale == chargeScales.end())
+                continue;
+            particleTOFScale = scale->second.first;
+            particleTrackerScale = scale->second.second;
+        }
+
         bool trackerComplete = true;
         for (int layer = 1; layer <= 7; ++layer)
             trackerComplete = trackerComplete && particle.TRACKER_hitEdep[layer] > 0 &&
@@ -261,7 +319,7 @@ bool Util::saveBeta(const std::string &inputFile,
                     particle.TOF_hitTime,
                     particle.TOF_hitTimeError,
                     particle.TOF_length),
-                energyLossScale,
+                particleTOFScale,
                 1.0,
                 energyLossScaleMode,
                 referencePoint)
@@ -278,8 +336,8 @@ bool Util::saveBeta(const std::string &inputFile,
                     tofPosition,
                     particle.TRACKER_hitEdep,
                     trackerPosition),
-                energyLossScale,
-                trackerEnergyLossScale,
+                particleTOFScale,
+                particleTrackerScale,
                 energyLossScaleMode,
                 referencePoint)
                 .Beta();
