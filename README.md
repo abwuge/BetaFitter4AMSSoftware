@@ -1,34 +1,36 @@
 # betaEstimator
 
-Standalone study of AMS TOF beta estimators that is intentionally independent of `betaFitter` nonlinear propagation.
+Standalone AMS TOF beta-estimator study, intentionally independent of `betaFitter` nonlinear propagation.
 
-The current estimator starts from the four-layer affine timing slope
+The main analysis compares the new estimator directly with the current physical-boundary Hybrid on the **same validation events and the same true-beta bins**. `betaFitter` is read only: its existing train/validation source split and Hybrid `betaTree` outputs provide the baseline.
 
-\[
-u_0 = \frac{\sum_i (x_i-\bar{x})(t_i-\bar{t})}{\sum_i (x_i-\bar{x})^2},\qquad x_i=L_i/c,
-\]
+## Current analysis
 
-and studies event information orthogonal to the fitted common time and slope.  The first diagnostic is the per-layer timing residual
+The primary outputs are under `results/comparison/plots/`:
 
-\[
-r_i=t_i-\bar{t}-u_0(x_i-\bar{x}).
-\]
+- `residual_fits_Z1.pdf`, `residual_fits_Z2.pdf`, `residual_fits_Z6.pdf`, `residual_fits_Z8.pdf`: one page per 0.05-wide beta bin, overlaying Hybrid and New residual distributions plus Gaussian core fits.
+- `core_sigma_vs_beta.pdf`: Hybrid and New Gaussian core width as line graphs.
+- `core_mean_vs_beta.pdf`: Hybrid and New Gaussian core mean as line graphs.
+- `relative_improvement_vs_beta.pdf`: `(1 - sigma_new/sigma_hybrid) * 100%` as a line graph.
+- `results/comparison/per_bin_summary.csv`: numerical values used by the plots.
 
-`betaFitter` is used only as a source of the existing train/validation file split and as a physics-performance baseline; this repository does not link or call its nonlinear fitter.
+No total-beta spectrum or scatter plot is part of the main result.
 
-## Layout
+See `docs/hybrid-comparison.md` for the current findings.
 
-- `config/sources.conf`: snapshot of the existing independent train/validation MC split.
-- `macro/`: ROOT 6 analysis and plotting macros.
-- `results/`: durable generated results.
-- `docs/`: method notes.
+## Reproduce on ssh:sdiat
 
-## Layer residual plots
-
-Run from a clean shell on `ssh:sdiat` with ROOT 6:
+Extraction and ROOT writing use the existing system Python/uproot environment. The estimator training uses a temporary Python 3.6 environment because the host glibc/compiler cannot use current NumPy wheels; nothing is installed into the system Python.
 
 ```bash
-root -l -b -q 'macro/plotLayerResiduals.C()'
+python3 analysis/extract_inputs.py
+
+python3 -m venv /tmp/betaEstimator-venv
+/tmp/betaEstimator-venv/bin/pip install --only-binary=:all: -r requirements-sdiat.txt
+/tmp/betaEstimator-venv/bin/python analysis/train_estimator.py
+
+python3 analysis/write_comparison.py
+root -l -b -q 'macro/plotHybridComparison.C()'
 ```
 
-The macro uses validation files only, requires clean four-layer timing (`tof_bpatt == 4444`), reconstructed charge equal to MC charge, and `0.6 < beta_MC <= 1`.
+The canonical source split is the snapshot in `config/sources.conf`. Generated analysis products are ignored by Git.
