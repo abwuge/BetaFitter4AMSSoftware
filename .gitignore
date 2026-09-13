@@ -1,0 +1,7 @@
+# build artifacts
+*.so
+*.d
+*_C.*
+
+# generated analysis outputs
+results/
