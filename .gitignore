@@ -5,3 +5,7 @@
 
 # generated analysis outputs
 results/
+
+# Python bytecode
+__pycache__/
+*.pyc
