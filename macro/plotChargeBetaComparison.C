@@ -24,7 +24,7 @@
 namespace
 {
 constexpr int kNBetaBins = 28;
-constexpr int kNMethods = 2;
+constexpr int kNMethods = 3;
 constexpr double kResidualMin = -0.5;
 constexpr double kResidualMax = 1.5;
 constexpr double kIqrToSigma = 0.741301109252801;
@@ -44,10 +44,14 @@ struct ChargeResult
     double betaMin = 0;
     double betaMax = 1;
     std::array<FitSeries, kNMethods> methods;
+    std::array<TH1D *, kNMethods> lowBetaResiduals = {};
+    Long64_t commonEntries = 0;
+    Long64_t lowBetaEntries = 0;
 };
 
 bool fitCore(TH1D *hist, double &mean, double &meanError,
-             double &sigma, double &sigmaError, int minimumEntries)
+             double &sigma, double &sigmaError, int minimumEntries,
+             double *amplitude = nullptr)
 {
     if (!hist || hist->GetEntries() < minimumEntries)
         return false;
@@ -75,6 +79,7 @@ bool fitCore(TH1D *hist, double &mean, double &meanError,
     meanError = result->ParError(1);
     sigma = std::abs(result->Parameter(2));
     sigmaError = result->ParError(2);
+    if(amplitude) *amplitude=result->Parameter(0);
     return std::isfinite(mean) && std::isfinite(meanError) &&
            std::isfinite(sigma) && std::isfinite(sigmaError) &&
            sigma < 0.08 && meanError < 0.02 &&
@@ -110,32 +115,53 @@ ChargeResult analyzeCharge(const char *fileName, int charge, int minimumEntries)
             histograms[method][bin] = new TH1D(
                 Form("hResidual_Z%d_M%d_B%d", charge, method, bin), "",
                 800, kResidualMin, kResidualMax);
+    for (int method=0;method<kNMethods;++method)
+    {
+        output.lowBetaResiduals[method]=new TH1D(Form("lowBeta_Z%d_M%d",charge,method),"",320,-0.16,0.16);
+        output.lowBetaResiduals[method]->SetDirectory(nullptr);
+    }
 
     double mcBeta = 0;
     double linearBeta = 0;
     double nonlinearBeta = 0;
+    double hybridBeta = 0;
+    int measuredCharge = charge, mcCharge=charge;
+    const bool hasHybrid=tree->GetBranch("hybridBeta") &&
+        tree->GetEntries("hybridBeta>0 && TMath::Finite(hybridBeta)")>0;
     tree->SetBranchAddress("mcBeta", &mcBeta);
     tree->SetBranchAddress("linearBeta", &linearBeta);
     tree->SetBranchAddress("nonlinearBeta", &nonlinearBeta);
+    if(hasHybrid) tree->SetBranchAddress("hybridBeta", &hybridBeta);
+    if(tree->GetBranch("Z")) tree->SetBranchAddress("Z",&measuredCharge);
+    if(tree->GetBranch("mcCharge")) tree->SetBranchAddress("mcCharge",&mcCharge);
 
     const Long64_t entries = tree->GetEntries();
     for (Long64_t entry = 0; entry < entries; ++entry)
     {
         tree->GetEntry(entry);
+        if(measuredCharge!=charge || mcCharge!=charge) continue;
         if (!(mcBeta > 0) || !std::isfinite(mcBeta) ||
             mcBeta < output.betaMin || mcBeta > output.betaMax)
             continue;
 
         int bin = static_cast<int>((mcBeta - output.betaMin) / betaWidth);
         bin = std::max(0, std::min(kNBetaBins - 1, bin));
-        const double reconstructed[kNMethods] = {nonlinearBeta, linearBeta};
-        for (int method = 0; method < kNMethods; ++method)
+        const double reconstructed[kNMethods] = {nonlinearBeta, linearBeta, hybridBeta};
+        const int activeMethods=hasHybrid ? 3:2;
+        bool common=true;
+        for(int method=0;method<activeMethods;++method)
+            common=common && reconstructed[method]>0 && std::isfinite(reconstructed[method]);
+        if(!common) continue;
+        ++output.commonEntries;
+        if(mcBeta<0.9) ++output.lowBetaEntries;
+        for (int method = 0; method < activeMethods; ++method)
         {
             if (!(reconstructed[method] > 0) || !std::isfinite(reconstructed[method]))
                 continue;
             const double residual = 1.0 / reconstructed[method] - 1.0 / mcBeta;
             if (std::isfinite(residual))
                 histograms[method][bin]->Fill(residual);
+            if(mcBeta<0.9) output.lowBetaResiduals[method]->Fill(residual);
         }
     }
 
@@ -162,7 +188,9 @@ ChargeResult analyzeCharge(const char *fileName, int charge, int minimumEntries)
 
     std::cout << "Z=" << charge << ": " << entries << " entries, "
               << output.methods[0].beta.size() << " nonlinear bins, "
-              << output.methods[1].beta.size() << " linear bins" << std::endl;
+              << output.methods[1].beta.size() << " linear bins, "
+              << output.methods[2].beta.size() << " hybrid bins, common N="
+              << output.commonEntries << std::endl;
     file->Close();
     return output;
 }
@@ -213,17 +241,22 @@ void plotChargeBetaComparison(
     const char *z6File = "results/12.root",
     const char *z8File = "results/13.root",
     const char *outputName = nullptr,
-    int minimumEntries = 300)
+    int minimumEntries = 300,
+    const char *z1File = nullptr,
+    bool reportPages = false)
 {
     gROOT->SetBatch(true);
     gROOT->SetStyle("Pub");
     gROOT->ForceStyle();
     gStyle->SetOptStat(0);
     gStyle->SetEndErrorSize(4);
-    const std::array<const char *, 3> files = {z2File, z6File, z8File};
-    const std::array<int, 3> charges = {2, 6, 8};
-    std::array<ChargeResult, 3> results;
-    for (int index = 0; index < 3; ++index)
+    std::vector<const char *> files = {z2File, z6File, z8File};
+    std::vector<int> charges = {2, 6, 8};
+    if(z1File && z1File[0])
+    { files.insert(files.begin(),z1File); charges.insert(charges.begin(),1); }
+    const int nCharges=charges.size();
+    std::vector<ChargeResult> results(nCharges);
+    for (int index = 0; index < nCharges; ++index)
         results[index] = analyzeCharge(files[index], charges[index], minimumEntries);
 
     TString resolvedOutput = BetaFitterMacro::output_path(
@@ -234,18 +267,19 @@ void plotChargeBetaComparison(
     else
         pngOutput += ".png";
 
-    const int nonlinearColor = TColor::GetColor("#45364B");
-    const int linearColor = TColor::GetColor("#5F6077");
-    TCanvas canvas("chargeBetaComparison", "", 1500, 860);
-    canvas.Divide(3, 2, 0.002, 0.002);
+    const int nonlinearColor = kP6Blue;
+    const int linearColor = TColor::GetColor("#222222");
+    const int hybridColor = kP6Red;
+    TCanvas canvas("chargeBetaComparison", "", 500*nCharges, 860);
+    canvas.Divide(nCharges, 2, 0.002, 0.002);
 
-    for (int chargeIndex = 0; chargeIndex < 3; ++chargeIndex)
+    for (int chargeIndex = 0; chargeIndex < nCharges; ++chargeIndex)
     {
         const ChargeResult &result = results[chargeIndex];
         for (int row = 0; row < 2; ++row)
         {
-            canvas.cd(row * 3 + chargeIndex + 1);
-            gPad->SetLeftMargin(chargeIndex == 0 ? 0.16 : 0.12);
+            canvas.cd(row * nCharges + chargeIndex + 1);
+            gPad->SetLeftMargin(0.18);
             gPad->SetRightMargin(0.035);
             gPad->SetBottomMargin(row == 1 ? 0.15 : 0.11);
             gPad->SetTopMargin(row == 0 ? 0.12 : 0.06);
@@ -257,14 +291,14 @@ void plotChargeBetaComparison(
             TH1F *frame = gPad->DrawFrame(result.betaMin, range.first,
                                           result.betaMax, range.second);
             frame->SetTitle(row == 0 ? Form("Z = %d", result.charge) : "");
-            frame->GetXaxis()->SetTitle("#beta_{MC} at AMS center");
+            frame->GetXaxis()->SetTitle("#beta_{MC} at L5 (center ref.)");
             frame->GetYaxis()->SetTitle(sigma ? "Core #sigma(1/#beta residual)"
                                                : "Core #mu(1/#beta residual)");
             frame->GetXaxis()->SetTitleSize(0.052);
             frame->GetYaxis()->SetTitleSize(0.052);
             frame->GetXaxis()->SetLabelSize(0.043);
             frame->GetYaxis()->SetLabelSize(0.043);
-            frame->GetYaxis()->SetTitleOffset(chargeIndex == 0 ? 1.45 : 1.20);
+            frame->GetYaxis()->SetTitleOffset(1.55);
 
             TLine zero(result.betaMin, 0, result.betaMax, 0);
             if (!sigma)
@@ -272,7 +306,7 @@ void plotChargeBetaComparison(
                 zero.SetLineColor(TColor::GetColor("#788AA3"));
                 zero.SetLineStyle(2);
                 zero.SetLineWidth(2);
-                zero.Draw("SAME");
+                zero.DrawClone("SAME");
             }
 
             TGraphErrors *nonlinear = makeGraph(result.methods[0], sigma,
@@ -281,6 +315,8 @@ void plotChargeBetaComparison(
                                               linearColor, 21);
             nonlinear->Draw("LP SAME");
             linear->Draw("LP SAME");
+            TGraphErrors *hybrid=makeGraph(result.methods[2],sigma,hybridColor,22);
+            if(hybrid->GetN()) hybrid->Draw("LP SAME");
 
             if (row == 0)
             {
@@ -289,17 +325,18 @@ void plotChargeBetaComparison(
                 chargeLabel.SetTextFont(42);
                 chargeLabel.SetTextSize(0.060);
                 chargeLabel.SetTextAlign(22);
-                chargeLabel.DrawLatex(0.52, 0.94, Form("Z = %d", result.charge));
+                chargeLabel.DrawLatex(0.52, 0.94, Form("Z = %d, N = %lld", result.charge,result.commonEntries));
             }
 
             if (row == 0 && chargeIndex == 0)
             {
-                TLegend *legend = new TLegend(0.58, 0.67, 0.91, 0.84);
+                TLegend *legend = new TLegend(0.58, 0.67, 0.94, 0.84);
                 legend->SetBorderSize(0);
                 legend->SetFillStyle(0);
-                legend->SetTextSize(0.045);
+                legend->SetTextSize(0.039);
                 legend->AddEntry(nonlinear, "Nonlinear", "lp");
                 legend->AddEntry(linear, "Linear", "lp");
+                if(hybrid->GetN()) legend->AddEntry(hybrid,"Hybrid (1 cm)","lp");
                 legend->Draw();
             }
         }
@@ -307,6 +344,110 @@ void plotChargeBetaComparison(
 
     canvas.SaveAs(resolvedOutput);
     canvas.SaveAs(pngOutput);
+    // Re-layout the exact fitted panels for presentation; keep the event
+    // selection, fit results and original overview untouched.
+    if(reportPages && nCharges==4)
+        for(int row=0;row<2;++row)
+        {
+            TCanvas page(Form("reportCore%d",row),"",1600,1000);
+            for(int index=0;index<nCharges;++index)
+            {
+                page.cd();
+                auto pad=static_cast<TPad *>(canvas.GetPad(row*nCharges+index+1)->Clone(
+                    Form("reportCorePad%d_%d",row,index)));
+                const double x=(index%2)*0.5, y=(1-index/2)*0.5;
+                pad->SetPad(x,y,x+0.5,y+0.5);
+                pad->SetTopMargin(0.12);
+                pad->SetBottomMargin(0.17);
+                pad->Draw();pad->cd();
+                if(row==1)
+                {
+                    TLatex label;label.SetNDC();label.SetTextFont(42);
+                    label.SetTextSize(0.055);label.SetTextAlign(22);
+                    label.DrawLatex(0.52,0.94,Form("Z = %d, N = %lld",results[index].charge,results[index].commonEntries));
+                    if(index==0)
+                    {
+                        auto legend=new TLegend(0.57,0.68,0.93,0.85);
+                        legend->SetBorderSize(0);legend->SetFillStyle(0);legend->SetTextSize(0.037);
+                        const int legendColors[3]={nonlinearColor,linearColor,hybridColor};
+                        const char *legendLabels[3]={"Nonlinear","Linear","Hybrid (1 cm)"};
+                        for(int method=0;method<3;++method)
+                            legend->AddEntry(makeGraph(results[index].methods[method],true,legendColors[method],20+method),legendLabels[method],"lp");
+                        legend->Draw();
+                    }
+                }
+            }
+            TString pdf=resolvedOutput;pdf.ReplaceAll(".pdf",row==0 ? "_mean.pdf":"_sigma.pdf");
+            TString png=pdf;png.ReplaceAll(".pdf",".png");
+            page.SaveAs(pdf);page.SaveAs(png);
+        }
+    TString rootOutput=resolvedOutput; rootOutput.ReplaceAll(".pdf",".root");
+    TFile numerical(rootOutput,"RECREATE");
+    for(const auto &result:results)
+        for(int method=0;method<kNMethods;++method)
+        {
+            result.lowBetaResiduals[method]->Write();
+            auto mean=makeGraph(result.methods[method],false,kBlack,20);
+            auto sigma=makeGraph(result.methods[method],true,kBlack,20);
+            mean->Write(Form("mean_Z%d_M%d",result.charge,method));
+            sigma->Write(Form("sigma_Z%d_M%d",result.charge,method));
+        }
+    numerical.Close();
+    TCanvas residualCanvas("hybridResiduals","",500*nCharges,580);
+    residualCanvas.Divide(nCharges,1,0.005,0.005);
+    const int colors[3]={nonlinearColor,linearColor,hybridColor};
+    const char *labels[3]={"Nonlinear","Linear","Hybrid"};
+    for(int index=0;index<nCharges;++index)
+    {
+        residualCanvas.cd(index+1);
+        gPad->SetLeftMargin(0.18);gPad->SetRightMargin(0.035);
+        gPad->SetBottomMargin(0.14);gPad->SetTopMargin(0.08);
+        auto &result=results[index];
+        double maximum=0;
+        for(auto hist:result.lowBetaResiduals) maximum=std::max(maximum,hist->GetMaximum());
+        auto frame=gPad->DrawFrame(-0.08,0,0.08,maximum*1.8);
+        frame->GetXaxis()->SetTitle("1/#beta_{reco} - 1/#beta_{MC}");
+        frame->GetYaxis()->SetTitle("Events / 0.001");
+        frame->GetXaxis()->SetTitleSize(0.047);frame->GetYaxis()->SetTitleSize(0.047);
+        frame->GetXaxis()->SetLabelSize(0.040);frame->GetYaxis()->SetLabelSize(0.040);
+        frame->GetYaxis()->SetTitleOffset(1.65);
+        TLatex text;text.SetNDC();text.SetTextFont(42);text.SetTextSize(0.037);
+        text.DrawLatex(0.20,0.96,Form("Z = %d, #beta_{MC}<0.9, N = %lld",result.charge,result.lowBetaEntries));
+        for(int method=0;method<kNMethods;++method)
+        {
+            auto hist=result.lowBetaResiduals[method];
+            if(!hist->GetEntries()) continue;
+            hist->SetLineColor(colors[method]);hist->SetLineWidth(2);hist->Draw("HIST SAME");
+            double mean,em,sigma,es,amplitude;
+            if(fitCore(hist,mean,em,sigma,es,50,&amplitude))
+            {
+                TF1 fit(Form("lowfit_Z%d_M%d",result.charge,method),"gaus",mean-3*sigma,mean+3*sigma);
+                fit.SetParameters(amplitude,mean,sigma);
+                fit.SetLineColor(colors[method]);fit.SetLineStyle(2);fit.SetLineWidth(3);fit.DrawCopy("SAME");
+                text.SetTextColor(colors[method]);
+                text.DrawLatex(0.23,0.87-method*0.105,labels[method]);
+                text.DrawLatex(0.23,0.825-method*0.105,Form("#mu=%.4f#pm%.4f, #sigma=%.4f#pm%.4f",mean,em,sigma,es));
+                std::cout<<"LOW_BETA Z="<<result.charge<<" "<<labels[method]<<" N="<<result.lowBetaEntries<<" mean="<<mean<<" meanError="<<em<<" sigma="<<sigma<<" sigmaError="<<es<<std::endl;
+            }
+        }
+    }
+    TString residualPdf=resolvedOutput;residualPdf.ReplaceAll(".pdf","_residuals.pdf");
+    TString residualPng=residualPdf;residualPng.ReplaceAll(".pdf",".png");
+    residualCanvas.SaveAs(residualPdf);residualCanvas.SaveAs(residualPng);
+    if(reportPages && nCharges==4)
+    {
+        TCanvas page("reportLowBeta","",1600,1000);
+        for(int index=0;index<nCharges;++index)
+        {
+            page.cd();
+            auto pad=static_cast<TPad *>(residualCanvas.GetPad(index+1)->Clone(Form("reportResidualPad%d",index)));
+            const double x=(index%2)*0.5, y=(1-index/2)*0.5;
+            pad->SetPad(x,y,x+0.5,y+0.5);pad->Draw();
+        }
+        TString pdf=resolvedOutput;pdf.ReplaceAll(".pdf","_low_beta.pdf");
+        TString png=pdf;png.ReplaceAll(".pdf",".png");
+        page.SaveAs(pdf);page.SaveAs(png);
+    }
     std::cout << "Saved comparison to " << resolvedOutput << " and " << pngOutput << std::endl;
 }
 

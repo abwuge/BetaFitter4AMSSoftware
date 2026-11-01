@@ -6,6 +6,8 @@
 #include <memory>
 #include <vector>
 
+#include "HybridEnergyLoss.h"
+
 enum class EnergyLossScaleMode
 {
     All,
@@ -127,6 +129,20 @@ public:
         const float trackerEnergyDeposited[9],
         const float trackerPosition[9][3]);
 
+    BetaNLPars(
+        const double beta,
+        const double mass,
+        const float energyDeposited[nTOF],
+        const float hitTime[nTOF],
+        const float hitTimeError[nTOF],
+        const float pathLength[nTOF],
+        const float tofPosition[nTOF][3],
+        const float trackerEnergyDeposited[9],
+        const float trackerPosition[9][3],
+        const int charge,
+        const double elementAbundance[HybridEnergyLossCalibration::nSegments]
+                                     [HybridEnergyLossCalibration::nElements]);
+
     /**
      * Destructor
      */
@@ -146,6 +162,8 @@ public:
      * @return Mass (GeV/c^2)
      */
     double Mass() const { return _mass; }
+    void SetMaterialProfile(const HybridMaterialProfile &profile)
+    { _materialProfile = std::make_shared<HybridMaterialProfile>(profile); }
 
     // Setters
     // ---------------------------------------------------------------------------
@@ -187,6 +205,12 @@ private:
     std::array<double, 9> _trackerEnergyDeposited = {};         // Tracker deposits in GeV
     std::array<std::array<double, 3>, 9> _trackerPosition = {}; // Tracker hit positions in cm
     bool _useTrackerEnergyLoss = false;                         // Use tracker-aware propagation
+    int _charge = 0;
+    std::array<std::array<double, HybridEnergyLossCalibration::nElements>,
+               HybridEnergyLossCalibration::nSegments>
+        _elementAbundance = {};
+    bool _useHybridEnergyLoss = false;
+    std::shared_ptr<const HybridMaterialProfile> _materialProfile;
 
     friend class BetaNL;
 };
@@ -222,12 +246,14 @@ public:
            double energyLossScale = 2,
            double trackerEnergyLossScale = 1,
            EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All,
-           BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter)
+           BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter,
+           std::shared_ptr<const HybridEnergyLossCalibration> hybridCalibration = nullptr)
         : _pars(std::make_shared<BetaNLPars>(pars)),
           _energyLossScale(energyLossScale),
           _trackerEnergyLossScale(trackerEnergyLossScale),
           _energyLossScaleMode(energyLossScaleMode),
-          _referencePoint(referencePoint) {};
+          _referencePoint(referencePoint),
+          _hybridCalibration(hybridCalibration) {};
 
     /**
      * Destructor
@@ -248,6 +274,8 @@ public:
      * @return Reconstructed 1/beta value
      */
     double InvBeta() { return reconstruct(); }
+    int FitStatus() { reconstruct(); return _fitStatus; }
+    double Chi2() { reconstruct(); return _fitChi2; }
 
     // Functions
     // ---------------------------------------------------------------------------
@@ -265,6 +293,8 @@ private:
     double betaChi2(const double *params);                       // Calculate chi-square for beta reconstruction
     double scaleChi2(const double *params, const double mcBeta); // Calculate chi-square for energy loss scale
     double reconstruct();                                        // Reconstruct the 1/beta value
+    int _fitStatus = -1;
+    double _fitChi2 = 0;
 
 private:
     std::shared_ptr<BetaNLPars> _pars;          // Parameters for the beta non-linear reconstruction
@@ -273,6 +303,7 @@ private:
     double _trackerEnergyLossScale = 1;         // Tracker energy loss scale factor
     EnergyLossScaleMode _energyLossScaleMode = EnergyLossScaleMode::All;
     BetaReferencePoint _referencePoint = BetaReferencePoint::AMSCenter;
+    std::shared_ptr<const HybridEnergyLossCalibration> _hybridCalibration;
     double _timeOffset = 0;                     // Reconstructed time offset in ns
 };
 

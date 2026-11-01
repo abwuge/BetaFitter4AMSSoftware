@@ -5,6 +5,7 @@
 #include <Math/Minimizer.h>
 #include <TMath.h>
 
+#include <algorithm>
 #include <limits>
 
 namespace
@@ -58,6 +59,32 @@ BetaNLPars::BetaNLPars(
             _trackerPosition[layer][coordinate] = trackerPosition[layer][coordinate];
     }
     _useTrackerEnergyLoss = true;
+}
+
+BetaNLPars::BetaNLPars(
+    const double beta,
+    const double mass,
+    const float energyDeposited[nTOF],
+    const float hitTime[nTOF],
+    const float hitTimeError[nTOF],
+    const float pathLength[nTOF],
+    const float tofPosition[nTOF][3],
+    const float trackerEnergyDeposited[9],
+    const float trackerPosition[9][3],
+    const int charge,
+    const double elementAbundance[HybridEnergyLossCalibration::nSegments]
+                                 [HybridEnergyLossCalibration::nElements])
+    : BetaNLPars(beta, mass, energyDeposited, hitTime, hitTimeError, pathLength,
+                 tofPosition, trackerEnergyDeposited, trackerPosition)
+{
+    _charge = charge;
+    for (int segment = 0; segment < HybridEnergyLossCalibration::nSegments;
+         ++segment)
+        for (int element = 0; element < HybridEnergyLossCalibration::nElements;
+             ++element)
+            _elementAbundance[segment][element] =
+                elementAbundance[segment][element];
+    _useHybridEnergyLoss = true;
 }
 
 BetaNLPars::BetaNLPars(
@@ -200,6 +227,163 @@ std::vector<double> BetaNL::propagate(double beta) const
     const double mass = _pars->_mass;
     const double massSquared = _pars->_massSquared;
     double energy = mass / TMath::Sqrt(1 - beta * beta);
+
+    if (_hybridCalibration && _pars->_useHybridEnergyLoss)
+    {
+        const auto inverseBetaAtEnergy = [&](double value)
+        {
+            if (!(value > mass) || !std::isfinite(value))
+                return std::numeric_limits<double>::quiet_NaN();
+            return 1.0 / std::sqrt(1.0 - massSquared / (value * value));
+        };
+        const auto segmentTime = [&](double length, double energyIn,
+                                     double energyOut)
+        {
+            return 0.5 * length * inv_c *
+                   (inverseBetaAtEnergy(energyIn) +
+                    inverseBetaAtEnergy(energyOut));
+        };
+        const auto measuredDeposit = [&](int segment)
+        {
+            if (segment == 0)
+                return _pars->_energyDeposited[0] + _pars->_energyDeposited[1];
+            if (segment == 3)
+                return _pars->_energyDeposited[2] + _pars->_energyDeposited[3];
+            double deposit = 0.5 * _pars->_trackerEnergyDeposited[4];
+            const int first = segment == 1 ? 1 : 5;
+            const int last = segment == 1 ? 3 : 7;
+            for (int layer = first; layer <= last; ++layer)
+                deposit += _pars->_trackerEnergyDeposited[layer];
+            return deposit;
+        };
+        const auto energyLoss = [&](int segment, double value)
+        {
+            const double localInvBeta = inverseBetaAtEnergy(value);
+            if (!std::isfinite(localInvBeta))
+                return std::numeric_limits<double>::quiet_NaN();
+            return _hybridCalibration->EstimateLoss(
+                segment, _pars->_charge, 1.0 / localInvBeta, mass,
+                _pars->_elementAbundance[segment].data(),
+                measuredDeposit(segment));
+        };
+
+        if (_pars->_materialProfile && _pars->_materialProfile->valid)
+        {
+            const auto &profile = *_pars->_materialProfile;
+            const auto advance = [&](const HybridMaterialStep &cell,
+                                      double &currentEnergy, double &time,
+                                      double sign)
+            {
+                bool vacuum=true;
+                for(double value:cell.abundance) vacuum=vacuum && value==0;
+                if(vacuum)
+                {
+                    time += (sign>0 ? -1.0:1.0)*cell.length*inv_c*inverseBetaAtEnergy(currentEnergy);
+                    return std::isfinite(time);
+                }
+                // Share only the regional fluctuation across material cells;
+                // do not introduce unmeasured independent passive fluctuations.
+                const auto lossAt = [&](double trialEnergy)
+                {
+                    const double inv = inverseBetaAtEnergy(trialEnergy);
+                    if (!std::isfinite(inv)) return std::numeric_limits<double>::quiet_NaN();
+                    const double localBeta = 1.0/inv;
+                    const double total = HybridEnergyLossCalibration::MaterialMean(
+                        localBeta,mass,_pars->_charge,
+                        profile.abundance[cell.segment].data());
+                    const double part = HybridEnergyLossCalibration::MaterialMean(
+                        localBeta,mass,_pars->_charge,cell.abundance.data());
+                    if (!(total>0)) return 0.0;
+                    return _hybridCalibration->EstimateLoss(cell.segment,_pars->_charge,
+                        localBeta,mass,profile.abundance[cell.segment].data(),
+                        measuredDeposit(cell.segment))*part/total;
+                };
+                const double firstLoss=lossAt(currentEnergy);
+                const double midpoint=currentEnergy+0.5*sign*firstLoss;
+                const double nextEnergy=currentEnergy+sign*lossAt(midpoint);
+                if (!(nextEnergy>mass) || !std::isfinite(nextEnergy)) return false;
+                time += (sign>0 ? -1.0:1.0)*segmentTime(cell.length,currentEnergy,nextEnergy);
+                currentEnergy=nextEnergy;
+                return true;
+            };
+            if (_referencePoint == BetaReferencePoint::AMSCenter)
+            {
+                double e=energy, time=0;
+                for(auto it=profile.steps.rbegin();it!=profile.steps.rend();++it)
+                {
+                    if(it->zLow < profile.centerZ-1e-6 ||
+                       it->zHigh > profile.tofCenterZ[0]+1e-6) continue;
+                    if(!advance(*it,e,time,1)) return std::vector<double>(4,std::numeric_limits<double>::quiet_NaN());
+                    if(it->tofAtHigh>=0) hitTimes[it->tofAtHigh]=time;
+                }
+                e=energy; time=0;
+                for(const auto &cell:profile.steps)
+                {
+                    if(cell.zHigh > profile.centerZ+1e-6 ||
+                       cell.zLow < profile.tofCenterZ[3]-1e-6) continue;
+                    if(!advance(cell,e,time,-1)) return std::vector<double>(4,std::numeric_limits<double>::quiet_NaN());
+                    if(cell.tofAtLow>=0) hitTimes[cell.tofAtLow]=time;
+                }
+                return hitTimes;
+            }
+            double time=0;
+            for(const auto &cell:profile.steps)
+            {
+                if(cell.zLow < profile.tofCenterZ[3]-1e-6) break;
+                if(!advance(cell,energy,time,-1)) return std::vector<double>(4,std::numeric_limits<double>::quiet_NaN());
+                if(cell.tofAtLow>=0) hitTimes[cell.tofAtLow]=time;
+            }
+            return hitTimes;
+        }
+
+        if (_referencePoint == BetaReferencePoint::AMSCenter)
+        {
+            const double upperInnerLoss = energyLoss(1, energy);
+            const double energyAfterS2 = energy + upperInnerLoss;
+            const double upperTofLoss = energyLoss(0, energyAfterS2);
+            const double energyBeforeS1 = energyAfterS2 + upperTofLoss;
+
+            const double lowerInnerLoss = energyLoss(2, energy);
+            const double energyBeforeS3 = energy - lowerInnerLoss;
+            const double lowerTofLoss = energyLoss(3, energyBeforeS3);
+            const double energyAfterS4 = energyBeforeS3 - lowerTofLoss;
+
+            if (!std::isfinite(energyBeforeS1) ||
+                !std::isfinite(energyAfterS4) || !(energyAfterS4 > mass))
+                return hitTimes;
+
+            hitTimes[1] = segmentTime(paths[1], energy, energyAfterS2);
+            hitTimes[0] = hitTimes[1] +
+                          segmentTime(paths[0], energyAfterS2, energyBeforeS1);
+            hitTimes[2] = segmentTime(paths[2], energy, energyBeforeS3);
+            hitTimes[3] = hitTimes[2] +
+                          segmentTime(paths[3], energyBeforeS3, energyAfterS4);
+            return hitTimes;
+        }
+
+        const double upperTofLoss = energyLoss(0, energy);
+        const double energyAfterS2 = energy - upperTofLoss;
+        hitTimes[1] = segmentTime(paths[1], energy, energyAfterS2);
+
+        const double upperInnerLoss = energyLoss(1, energyAfterS2);
+        const double energyAtCenter = energyAfterS2 - upperInnerLoss;
+        const double lowerInnerLoss = energyLoss(2, energyAtCenter);
+        const double energyBeforeS3 = energyAtCenter - lowerInnerLoss;
+        constexpr double upperInnerFraction = 0.4845;
+        hitTimes[2] = hitTimes[1] +
+                      segmentTime(paths[2] * upperInnerFraction,
+                                  energyAfterS2, energyAtCenter) +
+                      segmentTime(paths[2] * (1 - upperInnerFraction),
+                                  energyAtCenter, energyBeforeS3);
+
+        const double lowerTofLoss = energyLoss(3, energyBeforeS3);
+        const double energyAfterS4 = energyBeforeS3 - lowerTofLoss;
+        if (!std::isfinite(energyAfterS4) || !(energyAfterS4 > mass))
+            return std::vector<double>(BetaNLPars::nTOF, 0.0);
+        hitTimes[3] = hitTimes[2] +
+                      segmentTime(paths[3], energyBeforeS3, energyAfterS4);
+        return hitTimes;
+    }
 
     const auto &deps = _pars->_energyDeposited;
 
@@ -357,6 +541,8 @@ double BetaNL::betaChi2(const double *params)
     {
         if (hitTimeMeasured[i] == -1)
             continue;
+        if (_pars->_materialProfile && !std::isfinite(hitTimeReconstructed[i]))
+            return 1e20;
         const double dt = hitTimeReconstructed[i] - (hitTimeMeasured[i] - _timeOffset);
         const double sigma = hitTimeError[i];
         chi2 += (dt * dt) / (sigma * sigma);
@@ -419,14 +605,28 @@ double BetaNL::reconstruct()
     if (_invBeta)
         return *_invBeta;
 
-    ROOT::Math::Minimizer *minimizer = ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad");
+    std::unique_ptr<ROOT::Math::Minimizer> minimizer(
+        ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
 
     ROOT::Math::Functor functor(this, &BetaNL::betaChi2, 2);
     minimizer->SetFunction(functor);
 
-    const double lowerInvBeta = 0.6; // beta < 1.67
-    const double upperInvBeta = 10;  // beta > 0.1
-    const double initialInvBeta = TMath::Range(lowerInvBeta, upperInvBeta, 1 / _pars->_beta);
+    const double broadLowerInvBeta = 0.6; // beta < 1.67
+    const double broadUpperInvBeta = 10;  // beta > 0.1
+    const double initialInvBeta =
+        TMath::Range(broadLowerInvBeta, broadUpperInvBeta, 1 / _pars->_beta);
+    // The hybrid loss is evaluated dynamically, so unphysical low-beta trial
+    // points can stop the particle and create flat local minima.  TOF already
+    // provides a precise seed; a +/-0.25 window is much wider than its
+    // resolution while keeping Minuit on the continuous physical branch.
+    const double lowerInvBeta = _hybridCalibration
+                                    ? std::max(broadLowerInvBeta,
+                                               initialInvBeta - 0.25)
+                                    : broadLowerInvBeta;
+    const double upperInvBeta = _hybridCalibration
+                                    ? std::min(broadUpperInvBeta,
+                                               initialInvBeta + 0.25)
+                                    : broadUpperInvBeta;
     minimizer->SetLimitedVariable(0, "invBeta", initialInvBeta, 1e-5, lowerInvBeta, upperInvBeta);
 
     const double timeError = _pars->_hitTimeError[0];
@@ -441,6 +641,8 @@ double BetaNL::reconstruct()
 
     _invBeta = std::make_shared<double>(minimizer->X()[0]);
     _timeOffset = minimizer->X()[1];
+    _fitStatus = minimizer->Status();
+    _fitChi2 = minimizer->MinValue();
 
     return *_invBeta;
 }

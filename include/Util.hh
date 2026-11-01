@@ -52,7 +52,9 @@ namespace Util
                   double trackerEnergyLossScale = 1,
                   EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All,
                   BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter,
-                  const std::string &scaleConfig = "none");
+                  const std::string &scaleConfig = "none",
+                  const std::string &hybridConfig = "none",
+                  double materialStep = 0.0);
 
     /**
      * @brief Save magnetic field information to ROOT file
@@ -82,6 +84,32 @@ namespace Util
                              const std::string &outputFile,
                              EnergyLossScaleMode energyLossScaleMode = EnergyLossScaleMode::All,
                              BetaReferencePoint referencePoint = BetaReferencePoint::AMSCenter);
+
+    /**
+     * @brief Export MC samples used to train the hybrid energy-loss model
+     *
+     * The output contains, for four physically defined detector regions, the
+     * charge-aware Bethe/material prediction, MC true energy loss, and matched
+     * TOF/tracker deposits. Region boundaries follow the hit TOF-bar surfaces.
+     * All energy quantities are stored in GeV.
+     *
+     * @param inputFile Path to an MC amstreea ROOT file
+     * @param outputFile Path to the hybrid training ROOT file
+     * @return bool True if at least one valid training sample is written
+     */
+    bool saveHybridEnergyLossTraining(const std::string &inputFile,
+                                      const std::string &outputFile,
+                                      double materialStep = 0.0);
+
+    /**
+     * @brief Fit hybrid energy-loss calibration parameters from a training tree
+     *
+     * @param inputFile ROOT file containing a hybridTraining tree
+     * @param outputFile Text calibration file consumed by saveBeta
+     * @return bool True if all available charge/segment bins are fitted
+     */
+    bool trainHybridEnergyLoss(const std::string &inputFile,
+                               const std::string &outputFile);
 
     /**
      * @brief Benchmark BetaNL::Beta() function average CPU time

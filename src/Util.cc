@@ -1,9 +1,12 @@
 #include "Util.hh"
 #include "amschain.h"
+#include "HybridEnergyLoss.h"
 #include "ParticlePropagator.hh"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <iomanip>
+#include <limits>
 #include <map>
 #include <sstream>
 #include <string>
@@ -11,12 +14,47 @@
 #include <vector>
 #include <TFile.h>
 #include <TTree.h>
+#include <TChain.h>
 #include <TPolyMarker3D.h>
 #include <TPolyLine3D.h>
 #include <TCanvas.h>
 #include <TView.h>
 #include <TText.h>
 #include <chrono>
+
+namespace
+{
+bool getHybridElementAbundance(
+    const ParticleData &particle,
+    double abundance[HybridEnergyLossCalibration::nSegments]
+                    [HybridEnergyLossCalibration::nElements])
+{
+    if (!(std::abs(particle.innerRigidity) > 0) ||
+        !std::isfinite(particle.innerRigidity))
+        return false;
+
+    double boundaryZ[5]{};
+    double tofCenterZ[4]{};
+    if (!HybridEnergyLossCalibration::RegionGeometry(
+            particle.TOF_bar, boundaryZ, tofCenterZ))
+        return false;
+
+    const AMSPoint point(particle.initCoo[0], particle.initCoo[1],
+                         particle.initCoo[2]);
+    const AMSDir direction(particle.initDir[0], particle.initDir[1],
+                           particle.initDir[2]);
+    for (int segment = 0; segment < HybridEnergyLossCalibration::nSegments;
+         ++segment)
+    {
+        const int status = Betalhd::betalhd_GetElementAbundance(
+            point, direction, particle.innerRigidity,
+            boundaryZ[segment], boundaryZ[segment + 1], abundance[segment]);
+        if (status != 0)
+            return false;
+    }
+    return true;
+}
+}
 
 float Util::getAverageMass(int charge)
 {
@@ -77,6 +115,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
     float tof_pos[4][3]{};
     float tof_dir[4][3]{};
     float tof_edep[4]{};
+    int tof_barid[4] = {-1, -1, -1, -1};
     float tk_pos[9][3]{};
     float tk_edep[9]{};
     float tk_q[2]{};
@@ -107,6 +146,8 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
     tree->SetBranchAddress("tof_pos", tof_pos);
     tree->SetBranchAddress("tof_dir", tof_dir);
     tree->SetBranchAddress("tof_edep", tof_edep);
+    if (tree->GetBranch("tof_barid"))
+        tree->SetBranchAddress("tof_barid", tof_barid);
     tree->SetBranchAddress("tk_pos", tk_pos);
     if (!tree->GetBranch("tk_edep"))
     {
@@ -177,6 +218,7 @@ std::vector<ParticleData> Util::loadParticleData(const std::string &inputFile,
             data.TOF_hitTimeError[j] = 0.1544809;
             data.TOF_hitEdep[j] = tof_edep[j];
             data.TOF_length[j] = tof_leng[j];
+            data.TOF_bar[j] = tof_barid[j];
         }
 
         for (int j = 0; j < ParticleData::TRACKER_MAX_HITS; ++j)
@@ -212,7 +254,9 @@ bool Util::saveBeta(const std::string &inputFile,
                     double trackerEnergyLossScale,
                     EnergyLossScaleMode energyLossScaleMode,
                     BetaReferencePoint referencePoint,
-                    const std::string &scaleConfig)
+                    const std::string &scaleConfig,
+                    const std::string &hybridConfig,
+                    double materialStep)
 {
     std::map<int, std::pair<double, double>> chargeScales;
     if (scaleConfig != "none")
@@ -256,6 +300,14 @@ bool Util::saveBeta(const std::string &inputFile,
         }
     }
 
+    std::shared_ptr<HybridEnergyLossCalibration> hybridCalibration;
+    if (hybridConfig != "none")
+    {
+        hybridCalibration = std::make_shared<HybridEnergyLossCalibration>();
+        if (!hybridCalibration->Load(hybridConfig))
+            return false;
+    }
+
     // Load particle data from input file
     std::vector<ParticleData> particles =
         Util::loadParticleData(inputFile, referencePoint);
@@ -281,6 +333,10 @@ bool Util::saveBeta(const std::string &inputFile,
     double linearBeta = 0;
     double nonlinearBetaLegacy = 0;
     double nonlinearBeta = 0;
+    double hybridBeta = std::numeric_limits<double>::quiet_NaN();
+    int hybridFitStatus = -1;
+    double hybridChi2 = 0;
+    int hybridSteps = 0;
     int Z = 0;
 
     // Set up branches
@@ -290,7 +346,13 @@ bool Util::saveBeta(const std::string &inputFile,
     tree->Branch("linearBeta", &linearBeta, "linearBeta/D");
     tree->Branch("nonlinearBetaLegacy", &nonlinearBetaLegacy, "nonlinearBetaLegacy/D");
     tree->Branch("nonlinearBeta", &nonlinearBeta, "nonlinearBeta/D");
+    tree->Branch("hybridBeta", &hybridBeta, "hybridBeta/D");
+    tree->Branch("hybridFitStatus", &hybridFitStatus, "hybridFitStatus/I");
+    tree->Branch("hybridChi2", &hybridChi2, "hybridChi2/D");
+    tree->Branch("hybridSteps", &hybridSteps, "hybridSteps/I");
     tree->Branch("Z", &Z, "Z/I");
+    int mcCharge = 0;
+    tree->Branch("mcCharge", &mcCharge, "mcCharge/I");
 
     // Process each particle
     for (const auto &particle : particles)
@@ -368,7 +430,54 @@ bool Util::saveBeta(const std::string &inputFile,
                 energyLossScaleMode,
                 referencePoint)
                 .Beta();
+        hybridBeta = std::numeric_limits<double>::quiet_NaN();
+        hybridFitStatus = -1; hybridChi2 = std::numeric_limits<double>::quiet_NaN(); hybridSteps=0;
+        if (hybridCalibration)
+        {
+            double elementAbundance[HybridEnergyLossCalibration::nSegments]
+                                   [HybridEnergyLossCalibration::nElements]{};
+            HybridMaterialProfile profile;
+            bool materialValid = false;
+            if (materialStep > 0)
+            {
+                profile = HybridEnergyLossCalibration::BuildProfile(
+                    particle.initCoo, particle.initDir, particle.innerRigidity,
+                    particle.TOF_bar, particle.TOF_length,
+                    particle.TRACKER_hitZ, materialStep);
+                materialValid = profile.valid;
+                for(int s=0;s<4;++s) for(int e=0;e<9;++e)
+                    elementAbundance[s][e]=profile.abundance[s][e];
+            }
+            else materialValid = getHybridElementAbundance(particle, elementAbundance);
+            if (materialValid && hybridCalibration->SupportsCharge(particle.charge))
+            {
+                BetaNLPars hybridPars(
+                                     particle.betaLinear,
+                                     particle.mass,
+                                     particle.TOF_hitEdep,
+                                     particle.TOF_hitTime,
+                                     particle.TOF_hitTimeError,
+                                     particle.TOF_length,
+                                     tofPosition,
+                                     particle.TRACKER_hitEdep,
+                                     trackerPosition,
+                                     particle.charge,
+                                     elementAbundance);
+                if (materialStep>0) hybridPars.SetMaterialProfile(profile);
+                BetaNL hybridFit(hybridPars,
+                                 particleTOFScale,
+                                 particleTrackerScale,
+                                 energyLossScaleMode,
+                                 referencePoint,
+                                 hybridCalibration);
+                hybridBeta=hybridFit.Beta();
+                hybridFitStatus=hybridFit.FitStatus();
+                hybridChi2=hybridFit.Chi2();
+                hybridSteps=profile.steps.size();
+            }
+        }
         Z = particle.charge;
+        mcCharge = particle.mcCharge;
 
         // Fill tree
         tree->Fill();
@@ -730,6 +839,738 @@ bool Util::saveEnergyLossScale(const std::string &inputFile,
     outFile->Close();
     delete outFile;
 
+    return true;
+}
+
+bool Util::saveHybridEnergyLossTraining(const std::string &inputFile,
+                                        const std::string &outputFile,
+                                        double materialStep)
+{
+    TFile *fileIn = TFile::Open(inputFile.c_str(), "READ");
+    if (!fileIn || fileIn->IsZombie())
+    {
+        std::cerr << "Error: Could not open file " << inputFile << std::endl;
+        return false;
+    }
+
+    TTree *treeIn = static_cast<TTree *>(fileIn->Get("amstreea"));
+    if (!treeIn)
+    {
+        std::cerr << "Error: Could not find amstreea tree in " << inputFile << std::endl;
+        fileIn->Close();
+        return false;
+    }
+
+    const char *requiredBranches[] = {
+        "mpar", "mch", "mmass", "mevmom1", "mevcoo1", "mevdir1",
+        "tof_pos", "tof_dir", "tof_edep", "tof_barid", "tk_edep",
+        "tk_q", "tk_qin", "tk_rigidity", "tof_leng", "tk_pos",
+        "mtofdep", "mtofpri", "mtofbar", "mtrmom", "mtrpri", "mtrcoo1"};
+    for (const char *branch : requiredBranches)
+    {
+        if (!treeIn->GetBranch(branch))
+        {
+            std::cerr << "Error: Missing required hybrid-training branch "
+                      << branch << " in " << inputFile << std::endl;
+            fileIn->Close();
+            return false;
+        }
+    }
+
+    int mpar = 0;
+    float mch = 0;
+    float mmass = 0;
+    float mevmom1[21]{};
+    float mevcoo1[21][3]{};
+    float mevdir1[21][3]{};
+    float tofPosition[ParticleData::TOF_MAX_HITS][3]{};
+    float tofDirection[ParticleData::TOF_MAX_HITS][3]{};
+    float tofEdepInput[ParticleData::TOF_MAX_HITS]{};
+    int tofBar[ParticleData::TOF_MAX_HITS]{};
+    float mcTofDepositInput[ParticleData::TOF_MAX_HITS]{};
+    int mcTofPrimary[ParticleData::TOF_MAX_HITS]{};
+    int mcTofBar[ParticleData::TOF_MAX_HITS]{};
+    float trackerEdepInput[ParticleData::TRACKER_MAX_HITS]{};
+    float trackerCharge[2]{};
+    float innerTrackerCharge[2][3]{};
+    float trackerRigidity = 0;
+    float tofLength[4]{};
+    float trackerPosition[9][3]{};
+    float mcTrackerMomentum[ParticleData::TRACKER_MAX_HITS]{};
+    int mcTrackerPrimary[ParticleData::TRACKER_MAX_HITS]{};
+    float mcTrackerCenter[ParticleData::TRACKER_MAX_HITS][3]{};
+
+    treeIn->SetBranchAddress("mpar", &mpar);
+    treeIn->SetBranchAddress("mch", &mch);
+    treeIn->SetBranchAddress("mmass", &mmass);
+    treeIn->SetBranchAddress("mevmom1", mevmom1);
+    treeIn->SetBranchAddress("mevcoo1", mevcoo1);
+    treeIn->SetBranchAddress("mevdir1", mevdir1);
+    treeIn->SetBranchAddress("tof_pos", tofPosition);
+    treeIn->SetBranchAddress("tof_dir", tofDirection);
+    treeIn->SetBranchAddress("tof_edep", tofEdepInput);
+    treeIn->SetBranchAddress("tof_barid", tofBar);
+    treeIn->SetBranchAddress("mtofdep", mcTofDepositInput);
+    treeIn->SetBranchAddress("mtofpri", mcTofPrimary);
+    treeIn->SetBranchAddress("mtofbar", mcTofBar);
+    treeIn->SetBranchAddress("tk_edep", trackerEdepInput);
+    treeIn->SetBranchAddress("tk_q", trackerCharge);
+    treeIn->SetBranchAddress("tk_qin", innerTrackerCharge);
+    treeIn->SetBranchAddress("tk_rigidity", &trackerRigidity);
+    treeIn->SetBranchAddress("tof_leng", tofLength);
+    treeIn->SetBranchAddress("tk_pos", trackerPosition);
+    treeIn->SetBranchAddress("mtrmom", mcTrackerMomentum);
+    treeIn->SetBranchAddress("mtrpri", mcTrackerPrimary);
+    treeIn->SetBranchAddress("mtrcoo1", mcTrackerCenter);
+
+    TFile *fileOut = TFile::Open(outputFile.c_str(), "RECREATE");
+    if (!fileOut || fileOut->IsZombie())
+    {
+        std::cerr << "Error: Could not create output file " << outputFile << std::endl;
+        fileIn->Close();
+        return false;
+    }
+
+    TTree *treeOut = new TTree(
+        "hybridTraining",
+        "Material-mean plus measured-fluctuation training samples");
+
+    Long64_t sourceEntry = -1;
+    int geantId = 0;
+    int charge = 0;
+    float mass = 0;
+    float mcBeta = 0;
+    float position[3]{};
+    float direction[3]{};
+    float segmentZ[5]{};
+    float segmentBeta[4]{};
+    float materialMean[4]{};
+    float truthLoss[4]{};
+    float measuredDeposit[4]{};
+    float tofDeposit[ParticleData::TOF_MAX_HITS]{};
+    float mcTofDeposit[ParticleData::TOF_MAX_HITS]{};
+    float truthBoundaryKinetic[5]{};
+    float truthCheckpointZ[5]{};
+    int truthCheckpoint[5]{};
+    float trackerDeposit[ParticleData::TRACKER_MAX_HITS]{};
+    double elementAbundance[HybridEnergyLossCalibration::nSegments]
+                           [HybridEnergyLossCalibration::nElements]{};
+
+    treeOut->Branch("sourceEntry", &sourceEntry, "sourceEntry/L");
+    treeOut->Branch("geantId", &geantId, "geantId/I");
+    treeOut->Branch("Z", &charge, "Z/I");
+    treeOut->Branch("mass", &mass, "mass/F");
+    treeOut->Branch("mcBeta", &mcBeta, "mcBeta/F");
+    treeOut->Branch("position", position, "position[3]/F");
+    treeOut->Branch("direction", direction, "direction[3]/F");
+    treeOut->Branch("segmentZ", segmentZ, "segmentZ[5]/F");
+    treeOut->Branch("segmentBeta", segmentBeta, "segmentBeta[4]/F");
+    treeOut->Branch("materialMean", materialMean, "materialMean[4]/F");
+    treeOut->Branch("truthLoss", truthLoss, "truthLoss[4]/F");
+    treeOut->Branch("measuredDeposit", measuredDeposit, "measuredDeposit[4]/F");
+    treeOut->Branch("tofDeposit", tofDeposit, "tofDeposit[4]/F");
+    treeOut->Branch("tofBar", tofBar, "tofBar[4]/I");
+    treeOut->Branch("mcTofDeposit", mcTofDeposit, "mcTofDeposit[4]/F");
+    treeOut->Branch("mcTofBar", mcTofBar, "mcTofBar[4]/I");
+    treeOut->Branch("mcTofPrimary", mcTofPrimary, "mcTofPrimary[4]/I");
+    treeOut->Branch("truthBoundaryKinetic", truthBoundaryKinetic,
+                    "truthBoundaryKinetic[5]/F");
+    treeOut->Branch("truthCheckpointZ", truthCheckpointZ,
+                    "truthCheckpointZ[5]/F");
+    treeOut->Branch("truthCheckpoint", truthCheckpoint,
+                    "truthCheckpoint[5]/I");
+    treeOut->Branch("trackerDeposit", trackerDeposit, "trackerDeposit[9]/F");
+    treeOut->Branch("elementAbundance", elementAbundance,
+                    "elementAbundance[4][9]/D");
+
+
+    for (Long64_t entry = 0; entry < treeIn->GetEntries(); ++entry)
+    {
+        treeIn->GetEntry(entry);
+
+        if (!(std::abs(mch) > 0) || !(mmass > 0) ||
+            !std::isfinite(mch) || !std::isfinite(mmass))
+            continue;
+        const int truthCharge = static_cast<int>(std::lround(std::abs(mch)));
+        const int reconstructedCharge = static_cast<int>(
+            (innerTrackerCharge[0][2] < 2.5 ? trackerCharge[1]
+                                            : innerTrackerCharge[0][2]) +
+            0.5);
+        if (reconstructedCharge != truthCharge)
+            continue;
+
+        bool valid = true;
+        double boundaryZ[5]{};
+        double tofCenterZ[4]{};
+        if (!HybridEnergyLossCalibration::RegionGeometry(
+                tofBar, boundaryZ, tofCenterZ))
+            continue;
+        for (int boundary = 0; boundary < 5; ++boundary)
+            segmentZ[boundary] = boundaryZ[boundary];
+
+        // Training uses a single, auditable bar identity for geometry, MC
+        // surface labels, and active-detector deposits.  Mismatched reco/MC
+        // bars are excluded rather than mixing two different material paths.
+        for (int station = 0; station < ParticleData::TOF_MAX_HITS; ++station)
+        {
+            valid = valid && tofBar[station] == mcTofBar[station] &&
+                    mcTofPrimary[station] == 1 &&
+                    mcTofDepositInput[station] >= 0 &&
+                    std::isfinite(mcTofDepositInput[station]) &&
+                    tofEdepInput[station] > 0 &&
+                    std::isfinite(tofEdepInput[station]);
+            tofDeposit[station] = tofEdepInput[station] * 1e-3;
+            mcTofDeposit[station] = mcTofDepositInput[station] * 1e-3;
+        }
+        for (int coordinate = 0; coordinate < 3; ++coordinate)
+            valid = valid && std::isfinite(tofPosition[0][coordinate]) &&
+                    std::isfinite(tofDirection[0][coordinate]);
+        valid = valid && std::isfinite(trackerRigidity) &&
+                std::abs(trackerRigidity) > 0;
+        if (!valid)
+            continue;
+
+        // AMS G4 acceptance planes at the actual staggered TOF bar centers.
+        // The recorded checkpoint is the post-step state after crossing that
+        // plane, so truthCheckpointZ is retained for explicit audit.
+        truthCheckpoint[0] = (tofBar[0] % 2 == 0) ? 3 : 4;   // S1 center
+        truthCheckpoint[1] = (tofBar[1] % 2 == 0) ? 5 : 6;   // S2 center
+        truthCheckpoint[2] = -1;                              // primary L5 TrMCCluster
+        truthCheckpoint[3] = (tofBar[2] % 2 == 0) ? 14 : 15; // S3 center
+        truthCheckpoint[4] = 17;                              // post-S4 G4 acceptance plane
+
+        double checkpointKinetic[5]{};
+        for (int boundary = 0; boundary < 5; ++boundary)
+        {
+            if (boundary == 2)
+            {
+                valid = valid && mcTrackerPrimary[4] == 1 &&
+                        mcTrackerMomentum[4] > 0 &&
+                        std::isfinite(mcTrackerMomentum[4]) &&
+                        std::isfinite(mcTrackerCenter[4][2]) &&
+                        std::abs(mcTrackerCenter[4][2] - boundaryZ[2]) < 0.03;
+                if (!valid)
+                    break;
+                checkpointKinetic[boundary] =
+                    std::sqrt(mcTrackerMomentum[4] * mcTrackerMomentum[4] +
+                              mmass * mmass) - mmass;
+                truthCheckpointZ[boundary] = mcTrackerCenter[4][2];
+                continue;
+            }
+
+            const int index = truthCheckpoint[boundary];
+            valid = valid && mevmom1[index] > 0 &&
+                    std::isfinite(mevmom1[index]);
+            for (int coordinate = 0; coordinate < 3; ++coordinate)
+                valid = valid && std::isfinite(mevcoo1[index][coordinate]) &&
+                        std::isfinite(mevdir1[index][coordinate]);
+            if (!valid)
+                break;
+            checkpointKinetic[boundary] =
+                std::sqrt(mevmom1[index] * mevmom1[index] + mmass * mmass) -
+                mmass;
+            truthCheckpointZ[boundary] = mevcoo1[index][2];
+        }
+        if (!valid)
+            continue;
+
+        // Move the S1/S2/S3 center-checkpoint energies to the actual bar
+        // surfaces using the primary MC deposit and the checkpoint's true z.
+        // This is a local within-scintillator interpolation; unlike the old
+        // fixed checkpoints, it respects each event's staggered hit bar.
+        const auto traversedFraction = [](double zHigh, double zLow,
+                                          double zPoint, double &fraction)
+        {
+            constexpr double tolerance = 0.02; // cm, only guards float/step edge noise
+            if (!(zHigh > zLow) || zPoint > zHigh + tolerance ||
+                zPoint < zLow - tolerance)
+                return false;
+            fraction = (zHigh - zPoint) / (zHigh - zLow);
+            fraction = std::max(0.0, std::min(1.0, fraction));
+            return std::isfinite(fraction);
+        };
+
+        const double s1High = boundaryZ[0];
+        const double s1Low = 2.0 * tofCenterZ[0] - s1High;
+        const double s2Low = boundaryZ[1];
+        const double s2High = 2.0 * tofCenterZ[1] - s2Low;
+        const double s3High = boundaryZ[3];
+        const double s3Low = 2.0 * tofCenterZ[2] - s3High;
+        double s1Traversed = 0;
+        double s2Traversed = 0;
+        double s3Traversed = 0;
+        valid = traversedFraction(s1High, s1Low, truthCheckpointZ[0],
+                                  s1Traversed) &&
+                traversedFraction(s2High, s2Low, truthCheckpointZ[1],
+                                  s2Traversed) &&
+                traversedFraction(s3High, s3Low, truthCheckpointZ[3],
+                                  s3Traversed);
+        if (!valid)
+            continue;
+
+        truthBoundaryKinetic[0] = checkpointKinetic[0] +
+                                  s1Traversed * mcTofDeposit[0];
+        truthBoundaryKinetic[1] = checkpointKinetic[1] -
+                                  (1.0 - s2Traversed) * mcTofDeposit[1];
+        truthBoundaryKinetic[2] = checkpointKinetic[2];
+        truthBoundaryKinetic[3] = checkpointKinetic[3] +
+                                  s3Traversed * mcTofDeposit[2];
+        truthBoundaryKinetic[4] = checkpointKinetic[4];
+        for (int boundary = 0; boundary < 5; ++boundary)
+            valid = valid && truthBoundaryKinetic[boundary] >= 0 &&
+                    std::isfinite(truthBoundaryKinetic[boundary]);
+        if (!valid)
+            continue;
+
+        for (int layer = 0; layer < ParticleData::TRACKER_MAX_HITS; ++layer)
+        {
+            valid = valid && std::isfinite(trackerEdepInput[layer]);
+            trackerDeposit[layer] = trackerEdepInput[layer] * 1e-3;
+        }
+        for (int layer = 1; layer <= 7; ++layer)
+            valid = valid && trackerEdepInput[layer] > 0;
+        if (!valid)
+            continue;
+
+        measuredDeposit[0] = tofDeposit[0] + tofDeposit[1];
+        // Region 1/2 meet at the L5 sensor reference plane, so split the L5
+        // active deposit symmetrically instead of assigning the full layer to
+        // either side of a boundary that runs through its center.
+        measuredDeposit[1] = 0.5 * trackerDeposit[4];
+        for (int layer = 1; layer <= 3; ++layer)
+            measuredDeposit[1] += trackerDeposit[layer];
+        measuredDeposit[2] = 0.5 * trackerDeposit[4];
+        for (int layer = 5; layer <= 7; ++layer)
+            measuredDeposit[2] += trackerDeposit[layer];
+        measuredDeposit[3] = tofDeposit[2] + tofDeposit[3];
+
+        HybridMaterialProfile profile;
+        if (materialStep > 0)
+        {
+            float trackerZ[9];
+            for (int i = 0; i < 9; ++i)
+                trackerZ[i] = trackerPosition[i][2];
+            profile = HybridEnergyLossCalibration::BuildProfile(
+                tofPosition[0], tofDirection[0], trackerRigidity, tofBar,
+                tofLength, trackerZ, materialStep);
+            if (!profile.valid)
+                continue;
+        }
+
+        const AMSPoint point(tofPosition[0][0], tofPosition[0][1],
+                             tofPosition[0][2]);
+        const AMSDir dir(tofDirection[0][0], tofDirection[0][1],
+                         tofDirection[0][2]);
+        for (int segment = 0; segment < 4; ++segment)
+        {
+            truthLoss[segment] = truthBoundaryKinetic[segment] -
+                                 truthBoundaryKinetic[segment + 1];
+            if (!(truthLoss[segment] >= 0) || !std::isfinite(truthLoss[segment]))
+            {
+                valid = false;
+                break;
+            }
+
+            int abundanceStatus = 0;
+            if (materialStep > 0)
+                for (int element = 0; element < 9; ++element)
+                    elementAbundance[segment][element] =
+                        profile.abundance[segment][element];
+            else
+                abundanceStatus = Betalhd::betalhd_GetElementAbundance(
+                    point, dir, trackerRigidity, segmentZ[segment],
+                    segmentZ[segment + 1], elementAbundance[segment]);
+
+            const double totalEnergy = truthBoundaryKinetic[segment] + mmass;
+            const double betaSquared =
+                1.0 - mmass * mmass / (totalEnergy * totalEnergy);
+            if (!(betaSquared > 0) || !(betaSquared < 1) ||
+                !std::isfinite(betaSquared))
+            {
+                valid = false;
+                break;
+            }
+            segmentBeta[segment] = std::sqrt(betaSquared);
+            materialMean[segment] = HybridEnergyLossCalibration::MaterialMean(
+                segmentBeta[segment], mmass, reconstructedCharge,
+                elementAbundance[segment]);
+            valid = valid && abundanceStatus == 0 && materialMean[segment] >= 0 &&
+                    std::isfinite(materialMean[segment]);
+        }
+        if (!valid)
+            continue;
+
+        sourceEntry = entry;
+        geantId = mpar;
+        charge = reconstructedCharge;
+        mass = mmass;
+        mcBeta = segmentBeta[0];
+        for (int coordinate = 0; coordinate < 3; ++coordinate)
+        {
+            position[coordinate] = tofPosition[0][coordinate];
+            direction[coordinate] = tofDirection[0][coordinate];
+        }
+        treeOut->Fill();
+    }
+
+    if (treeOut->GetEntries() == 0)
+    {
+        std::cerr << "Error: No valid hybrid training samples saved to "
+                  << outputFile << std::endl;
+        fileOut->Close();
+        fileIn->Close();
+        delete fileOut;
+        return false;
+    }
+
+    treeOut->Write();
+    std::cout << "Hybrid training samples: " << treeOut->GetEntries() << std::endl;
+    std::cout << "Hybrid training data saved to " << outputFile << std::endl;
+    fileOut->Close();
+    fileIn->Close();
+    delete fileOut;
+    return true;
+}
+
+bool Util::trainHybridEnergyLoss(const std::string &inputFile,
+                                 const std::string &outputFile)
+{
+    std::unique_ptr<TFile> file;
+    std::unique_ptr<TChain> chain;
+    TTree *tree = nullptr;
+    if (inputFile.size()>5 && inputFile.substr(inputFile.size()-5)==".list")
+    {
+        chain.reset(new TChain("hybridTraining"));
+        std::ifstream list(inputFile);
+        std::string path;
+        while(std::getline(list,path))
+            if(!path.empty() && path[0]!='#' && !chain->Add(path.c_str(),0))
+            { std::cerr<<"Invalid training part: "<<path<<std::endl;return false; }
+        chain->LoadTree(0);
+        tree=chain.get();
+    }
+    else
+    {
+        file.reset(TFile::Open(inputFile.c_str(), "READ"));
+        if(file && !file->IsZombie()) tree=static_cast<TTree *>(file->Get("hybridTraining"));
+    }
+    if (!tree)
+    {
+        std::cerr << "Error: Could not open hybrid training tree "
+                  << inputFile << std::endl;
+        return false;
+    }
+
+    int charge = 0;
+    float beta = 0;
+    float mass = 0;
+    float segmentBeta[HybridEnergyLossCalibration::nSegments]{};
+    float materialMean[HybridEnergyLossCalibration::nSegments]{};
+    float truthLoss[HybridEnergyLossCalibration::nSegments]{};
+    float measuredDeposit[HybridEnergyLossCalibration::nSegments]{};
+    tree->SetBranchAddress("Z", &charge);
+    tree->SetBranchAddress("mcBeta", &beta);
+    tree->SetBranchAddress("mass", &mass);
+    const bool hasSegmentBeta = tree->GetBranch("segmentBeta");
+    if (hasSegmentBeta)
+        tree->SetBranchAddress("segmentBeta", segmentBeta);
+    tree->SetBranchAddress("materialMean", materialMean);
+    tree->SetBranchAddress("truthLoss", truthLoss);
+    tree->SetBranchAddress("measuredDeposit", measuredDeposit);
+
+    struct TrainingRecord
+    {
+        int charge;
+        double beta[HybridEnergyLossCalibration::nSegments];
+        double material[HybridEnergyLossCalibration::nSegments];
+        double truth[HybridEnergyLossCalibration::nSegments];
+        double deposit[HybridEnergyLossCalibration::nSegments];
+    };
+    std::vector<TrainingRecord> records;
+    typedef std::pair<int, int> ChargeSegment;
+    std::map<ChargeSegment, std::vector<double>> betaValues;
+    records.reserve(tree->GetEntries());
+
+    for (Long64_t entry = 0; entry < tree->GetEntries(); ++entry)
+    {
+        tree->GetEntry(entry);
+        TrainingRecord record{};
+        record.charge = charge;
+        bool valid = charge > 0 && beta > 0 && beta < 1.0 &&
+                     mass > 0 && std::isfinite(beta) && std::isfinite(mass);
+        double boundaryEnergy = valid
+                                    ? mass / std::sqrt(1.0 - beta * beta)
+                                    : 0;
+        for (int segment = 0;
+             segment < HybridEnergyLossCalibration::nSegments; ++segment)
+        {
+            record.beta[segment] = hasSegmentBeta
+                                       ? segmentBeta[segment]
+                                       : (boundaryEnergy > mass
+                                              ? std::sqrt(1.0 - mass * mass /
+                                                                    (boundaryEnergy *
+                                                                     boundaryEnergy))
+                                              : 0);
+            record.material[segment] = materialMean[segment];
+            record.truth[segment] = truthLoss[segment];
+            record.deposit[segment] = measuredDeposit[segment];
+            valid = valid && record.beta[segment] > 0 &&
+                    record.beta[segment] < 1.000001 &&
+                    std::isfinite(record.beta[segment]) &&
+                    materialMean[segment] > 0 &&
+                    truthLoss[segment] >= 0 && measuredDeposit[segment] > 0 &&
+                    std::isfinite(materialMean[segment]) &&
+                    std::isfinite(truthLoss[segment]) &&
+                    std::isfinite(measuredDeposit[segment]);
+            boundaryEnergy -= truthLoss[segment];
+        }
+        if (!valid)
+            continue;
+        records.push_back(record);
+        for (int segment = 0;
+             segment < HybridEnergyLossCalibration::nSegments; ++segment)
+            betaValues[ChargeSegment(charge, segment)].push_back(
+                record.beta[segment]);
+    }
+    if (file) file->Close();
+
+    if (records.empty())
+    {
+        std::cerr << "Error: No valid hybrid training records in "
+                  << inputFile << std::endl;
+        return false;
+    }
+
+    std::map<ChargeSegment, std::vector<double>> betaEdges;
+    for (auto &segmentValues : betaValues)
+    {
+        std::vector<double> &values = segmentValues.second;
+        std::sort(values.begin(), values.end());
+        const int requestedBins = std::min(8, std::max(1,
+            static_cast<int>(values.size() / 500)));
+        std::vector<double> edges;
+        edges.push_back(0.0);
+        for (int bin = 1; bin < requestedBins; ++bin)
+        {
+            const size_t index = static_cast<size_t>(
+                static_cast<double>(bin) * values.size() / requestedBins);
+            const double edge = values[std::min(index, values.size() - 1)];
+            if (edge > edges.back() + 1e-6)
+                edges.push_back(edge);
+        }
+        edges.push_back(1.000001);
+        betaEdges[segmentValues.first] = edges;
+    }
+
+    struct FitAccumulator
+    {
+        long long entries = 0;
+        double sumMaterial = 0;
+        double sumTruth = 0;
+        double sumDeposit = 0;
+        double materialScale = 0;
+        double meanDeposit = 0;
+        double sumX2 = 0;
+        double sumResidual2 = 0;
+        double sumXResidual = 0;
+    };
+    std::map<ChargeSegment, std::vector<FitAccumulator>> fit;
+    for (const auto &edges : betaEdges)
+        fit[edges.first].resize(edges.second.size() - 1);
+
+    const auto findBin = [&](int recordCharge, int recordSegment,
+                             double recordBeta)
+    {
+        const ChargeSegment key(recordCharge, recordSegment);
+        const std::vector<double> &edges = betaEdges[key];
+        const auto upper = std::upper_bound(edges.begin(), edges.end(),
+                                            recordBeta);
+        int bin = static_cast<int>(upper - edges.begin()) - 1;
+        return std::max(0, std::min(bin,
+                                   static_cast<int>(edges.size()) - 2));
+    };
+
+    std::map<ChargeSegment, std::vector<std::vector<double>>> ratioValues;
+    for (const auto &edges : betaEdges)
+        ratioValues[edges.first].resize(edges.second.size() - 1);
+    for (const auto &record : records)
+    {
+        for (int segment = 0;
+             segment < HybridEnergyLossCalibration::nSegments; ++segment)
+        {
+            const int bin = findBin(record.charge, segment,
+                                    record.beta[segment]);
+            ratioValues[ChargeSegment(record.charge, segment)][bin].push_back(
+                record.truth[segment] / record.material[segment]);
+        }
+    }
+
+    struct RobustRange
+    {
+        double low = 0;
+        double high = std::numeric_limits<double>::max();
+    };
+    std::map<ChargeSegment, std::vector<RobustRange>> robustRanges;
+    const auto median = [](std::vector<double> values)
+    {
+        std::sort(values.begin(), values.end());
+        const size_t middle = values.size() / 2;
+        return values.size() % 2
+                   ? values[middle]
+                   : 0.5 * (values[middle - 1] + values[middle]);
+    };
+    for (const auto &segmentRatios : ratioValues)
+    {
+        robustRanges[segmentRatios.first].resize(segmentRatios.second.size());
+        for (size_t bin = 0; bin < segmentRatios.second.size(); ++bin)
+        {
+            const std::vector<double> &ratios = segmentRatios.second[bin];
+            if (ratios.empty())
+                continue;
+            const double center = median(ratios);
+            std::vector<double> deviations;
+            deviations.reserve(ratios.size());
+            for (double ratio : ratios)
+                deviations.push_back(std::abs(ratio - center));
+            const double sigma = 1.4826 * median(deviations);
+            const double halfWidth = sigma > 0 ? 10 * sigma
+                                               : std::max(1.0, center);
+            robustRanges[segmentRatios.first][bin].low =
+                std::max(0.0, center - halfWidth);
+            robustRanges[segmentRatios.first][bin].high =
+                center + halfWidth;
+        }
+    }
+
+    const auto accepted = [&](const TrainingRecord &record, int bin,
+                              int segment)
+    {
+        const double ratio =
+            record.truth[segment] / record.material[segment];
+        const RobustRange &range =
+            robustRanges[ChargeSegment(record.charge, segment)][bin];
+        return ratio >= range.low && ratio <= range.high;
+    };
+
+    for (const auto &record : records)
+    {
+        for (int segment = 0;
+             segment < HybridEnergyLossCalibration::nSegments; ++segment)
+        {
+            const ChargeSegment key(record.charge, segment);
+            const int bin = findBin(record.charge, segment,
+                                    record.beta[segment]);
+            if (!accepted(record, bin, segment))
+                continue;
+            FitAccumulator &accumulator = fit[key][bin];
+            ++accumulator.entries;
+            accumulator.sumMaterial += record.material[segment];
+            accumulator.sumTruth += record.truth[segment];
+            accumulator.sumDeposit += record.deposit[segment];
+        }
+    }
+
+    for (auto &segmentFit : fit)
+        for (auto &accumulator : segmentFit.second)
+        {
+            if (accumulator.entries == 0 ||
+                !(accumulator.sumMaterial > 0))
+                continue;
+            accumulator.materialScale =
+                accumulator.sumTruth / accumulator.sumMaterial;
+            accumulator.meanDeposit =
+                accumulator.sumDeposit / accumulator.entries;
+        }
+
+    for (const auto &record : records)
+    {
+        for (int segment = 0;
+             segment < HybridEnergyLossCalibration::nSegments; ++segment)
+        {
+            const ChargeSegment key(record.charge, segment);
+            const int bin = findBin(record.charge, segment,
+                                    record.beta[segment]);
+            if (!accepted(record, bin, segment))
+                continue;
+            FitAccumulator &accumulator = fit[key][bin];
+            const double centeredDeposit =
+                record.deposit[segment] - accumulator.meanDeposit;
+            const double residual = record.truth[segment] -
+                                    accumulator.materialScale *
+                                        record.material[segment];
+            accumulator.sumX2 += centeredDeposit * centeredDeposit;
+            accumulator.sumResidual2 += residual * residual;
+            accumulator.sumXResidual += centeredDeposit * residual;
+        }
+    }
+
+    std::ofstream output(outputFile.c_str());
+    if (!output)
+    {
+        std::cerr << "Error: Could not create hybrid calibration "
+                  << outputFile << std::endl;
+        return false;
+    }
+    output << "# betaFitter hybrid energy-loss calibration\n"
+           << "# Z segment beta_low beta_high entries material_scale "
+              "mean_deposit fluctuation_scale rms_before rms_after correlation\n"
+           << std::setprecision(12);
+
+    int writtenBins = 0;
+    for (const auto &segmentFit : fit)
+    {
+        const int recordCharge = segmentFit.first.first;
+        const int segment = segmentFit.first.second;
+        const std::vector<double> &edges = betaEdges[segmentFit.first];
+        for (size_t bin = 0; bin < segmentFit.second.size(); ++bin)
+        {
+                const FitAccumulator &accumulator = segmentFit.second[bin];
+                if (accumulator.entries < 20 || !(accumulator.sumX2 > 0))
+                    continue;
+                const double fittedFluctuationScale =
+                    accumulator.sumXResidual / accumulator.sumX2;
+                const double fittedCorrelation =
+                    accumulator.sumResidual2 > 0
+                        ? accumulator.sumXResidual /
+                              std::sqrt(accumulator.sumX2 *
+                                        accumulator.sumResidual2)
+                        : 0;
+                // Deposited energy is only useful as a fluctuation estimator
+                // where it has a reproducible positive relation to truth.
+                // Suppress statistically weak and sign-flipped regressions;
+                // otherwise they merely transfer detector noise into beta.
+                const double fluctuationScale = fittedCorrelation > 0.1
+                                                    ? fittedFluctuationScale
+                                                    : 0.0;
+                const double residualAfter2 = std::max(
+                    0.0,
+                    accumulator.sumResidual2 -
+                        2 * fluctuationScale * accumulator.sumXResidual +
+                        fluctuationScale * fluctuationScale *
+                            accumulator.sumX2);
+                const double rmsBefore = std::sqrt(
+                    accumulator.sumResidual2 / accumulator.entries);
+                const double rmsAfter = std::sqrt(
+                    residualAfter2 / accumulator.entries);
+                output << recordCharge << ' ' << segment << ' '
+                       << edges[bin] << ' ' << edges[bin + 1] << ' '
+                       << accumulator.entries << ' '
+                       << accumulator.materialScale << ' '
+                       << accumulator.meanDeposit << ' '
+                       << fluctuationScale << ' ' << rmsBefore << ' '
+                       << rmsAfter << ' ' << fittedCorrelation << '\n';
+                ++writtenBins;
+        }
+    }
+
+    if (writtenBins == 0)
+    {
+        std::cerr << "Error: Hybrid training sample is too small" << std::endl;
+        return false;
+    }
+    std::cout << "Hybrid calibration records: " << records.size() << std::endl;
+    std::cout << "Hybrid calibration bins: " << writtenBins << std::endl;
+    std::cout << "Hybrid calibration saved to " << outputFile << std::endl;
     return true;
 }
 
