@@ -1,36 +1,32 @@
 # betaEstimator
 
-Standalone AMS TOF beta-estimator study, intentionally independent of `betaFitter` nonlinear propagation.
+Archived on 2026-11-01 as a code module of the velocity-reconstruction work,
+together with `../betaFitter`. Further velocity-reconstruction research is stopped.
+The unified source snapshot and both histories are published in the existing
+BetaFitter4AMSSoftware repository on branch `archive/velocity-reconstruction`.
 
-The main analysis compares the new estimator directly with the current physical-boundary Hybrid on the **same validation events and the same true-beta bins**. `betaFitter` is read only: its existing train/validation source split and Hybrid `betaTree` outputs provide the baseline.
+AMS TOF beta reconstruction from flight measurements. RICH is an independent
+validation reference; RICH beta and MC truth do not enter the current training.
 
-## Current analysis
+The current carbon study covers 2.5–200 GV with three independently trained
+mass-constrained models. Training and validation use disjoint actual runs.
 
-The primary outputs are under `results/comparison/plots/`:
+- Train/evaluate: `analysis/flight_beta_wide.py`.
+- Frozen models and paired predictions: `results/flight_beta_wide/`.
+- Rigidity/beta curves: `analysis/plot_flight_beta_wide.py`.
+- Per-bin residual distributions: `analysis/plot_flight_beta_distributions.py`.
+- Larger NEWTOF validation: `analysis/prepare_tofcalib_validation.py` and
+  `analysis/tofcalib_validation_worker.py`; evaluate with
+  `analysis/evaluate_tofcalib_validation.py`, verify with
+  `analysis/verify_tofcalib_validation.py`; outputs in `results/tofcalib_validation/`.
 
-- `residual_fits_Z1.pdf`, `residual_fits_Z2.pdf`, `residual_fits_Z6.pdf`, `residual_fits_Z8.pdf`: one page per 0.05-wide beta bin, overlaying Hybrid and New residual distributions plus Gaussian core fits.
-- `core_sigma_vs_beta.pdf`: Hybrid and New Gaussian core width as line graphs.
-- `core_mean_vs_beta.pdf`: Hybrid and New Gaussian core mean as line graphs.
-- `relative_improvement_vs_beta.pdf`: `(1 - sigma_new/sigma_hybrid) * 100%` as a line graph.
-- `results/comparison/per_bin_summary.csv`: numerical values used by the plots.
+The NEWTOF validation preserves existing TOF measurements and supplements five
+missing native measurement branches. The completed 4096-file holdout contains
+907830 independent RICH reference events, with 48 rigidity bins and 29 beta bins.
+The frozen model gives an overall beta-residual W68 reduction of 2.9%; the
+2.5–6 GV region deteriorates by 3.0%, so the improvement is not uniform.
+Numerical outputs, models and necessary logs are retained; routine runs do not
+require generated reports.
 
-No total-beta spectrum or scatter plot is part of the main result.
-
-See `docs/hybrid-comparison.md` for the current findings.
-
-## Reproduce on ssh:sdiat
-
-Extraction and ROOT writing use the existing system Python/uproot environment. The estimator training uses a temporary Python 3.6 environment because the host glibc/compiler cannot use current NumPy wheels; nothing is installed into the system Python.
-
-```bash
-python3 analysis/extract_inputs.py
-
-python3 -m venv /tmp/betaEstimator-venv
-/tmp/betaEstimator-venv/bin/pip install --only-binary=:all: -r requirements-sdiat.txt
-/tmp/betaEstimator-venv/bin/python analysis/train_estimator.py
-
-python3 analysis/write_comparison.py
-root -l -b -q 'macro/plotHybridComparison.C()'
-```
-
-The canonical source split is the snapshot in `config/sources.conf`. Generated analysis products are ignored by Git.
+Earlier approaches remain under `results/`; their method descriptions are in
+`docs/`. `betaFitter` remains the comparison baseline.

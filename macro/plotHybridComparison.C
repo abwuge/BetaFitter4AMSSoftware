@@ -35,7 +35,7 @@ constexpr double kResidualMin = -0.16;
 constexpr double kResidualMax = 0.16;
 constexpr double kIqrToSigma = 0.741301109252801;
 constexpr int kColors[kNMethods] = {kP6Blue, kP6Yellow};
-constexpr const char *kLabels[kNMethods] = {"Hybrid", "New estimator"};
+const char *kLabels[kNMethods] = {"Hybrid", "Data-trained"};
 
 struct FitResult
 {
@@ -130,6 +130,18 @@ void styleGraph(TGraphErrors *graph, int method)
     graph->SetFillColorAlpha(kColors[method], 0.18);
 }
 
+void styleAxes(TH1D &frame)
+{
+    for (TAxis *axis : {frame.GetXaxis(), frame.GetYaxis()})
+    {
+        axis->SetLabelSize(0.038);
+        axis->SetTitleSize(0.042);
+        axis->CenterTitle();
+    }
+    frame.GetXaxis()->SetTitleOffset(1.15);
+    frame.GetYaxis()->SetTitleOffset(1.25);
+}
+
 void drawZero(double xmin, double xmax)
 {
     TLine *zero = new TLine(xmin, 0, xmax, 0);
@@ -141,9 +153,15 @@ void drawZero(double xmin, double xmax)
 
 } // namespace
 
-void plotHybridComparison(const char *inputDir = "results/comparison",
-                          const char *outputDir = "results/comparison/plots")
+void plotHybridComparison(const char *inputDir = "results/data_trained_comparison",
+                          const char *outputDir = "results/data_trained_comparison/plots",
+                          const char *baselineLabel = "Hybrid",
+                          const char *candidateLabel = "Data-trained",
+                          const char *baselineBranch = "hybridBeta",
+                          const char *candidateBranch = "newBeta")
 {
+    kLabels[0] = baselineLabel;
+    kLabels[1] = candidateLabel;
     gROOT->SetStyle("Pub");
     gROOT->ForceStyle();
     gStyle->SetOptStat(0);
@@ -167,8 +185,8 @@ void plotHybridComparison(const char *inputDir = "results/comparison",
         double hybridBeta = 0;
         double newBeta = 0;
         tree->SetBranchAddress("mcBeta", &mcBeta);
-        tree->SetBranchAddress("hybridBeta", &hybridBeta);
-        tree->SetBranchAddress("newBeta", &newBeta);
+        tree->SetBranchAddress(baselineBranch, &hybridBeta);
+        tree->SetBranchAddress(candidateBranch, &newBeta);
 
         for (int bin = 0; bin < kNBetaBins; ++bin)
         {
@@ -238,9 +256,9 @@ void plotHybridComparison(const char *inputDir = "results/comparison",
         for (int bin = 0; bin < kNBetaBins; ++bin)
         {
             canvas.Clear();
-            canvas.SetLeftMargin(0.11);
+            canvas.SetLeftMargin(0.14);
             canvas.SetRightMargin(0.04);
-            canvas.SetBottomMargin(0.12);
+            canvas.SetBottomMargin(0.16);
             canvas.SetTopMargin(0.12);
 
             std::array<TH1D *, kNMethods> shown = {};
@@ -263,14 +281,11 @@ void plotHybridComparison(const char *inputDir = "results/comparison",
             TH1D frame(Form("frame_Z%d_B%d", charge, bin), "", 320, kResidualMin, kResidualMax);
             frame.GetXaxis()->SetTitle("1/#beta_{reco} - 1/#beta_{MC}");
             frame.GetYaxis()->SetTitle("Normalized entries");
+            styleAxes(frame);
             frame.SetMinimum(0);
             frame.SetMaximum(maximum * 1.30);
             frame.Draw("AXIS");
 
-            TLegend legend(0.62, 0.65, 0.94, 0.86);
-            legend.SetBorderSize(0);
-            legend.SetFillStyle(0);
-            legend.SetTextSize(0.030);
             for (int method = 0; method < kNMethods; ++method)
             {
                 shown[method]->Draw("HIST SAME");
@@ -283,12 +298,19 @@ void plotHybridComparison(const char *inputDir = "results/comparison",
                 curve->SetLineStyle(2);
                 curve->SetLineWidth(3);
                 curve->Draw("SAME");
-                legend.AddEntry(shown[method],
-                                Form("%s: #mu=%.5f, #sigma=%.5f", kLabels[method], fit.mean, fit.sigma),
-                                "l");
+                TLatex annotation;
+                annotation.SetNDC();
+                annotation.SetTextFont(42);
+                annotation.SetTextSize(0.030);
+                annotation.SetTextColor(kColors[method]);
+                const double top = 0.82 - 0.22 * method;
+                annotation.DrawLatex(0.67, top, kLabels[method]);
+                annotation.DrawLatex(0.67, top - 0.055,
+                                     Form("#mu = %.5f #pm %.5f", fit.mean, fit.meanError));
+                annotation.DrawLatex(0.67, top - 0.11,
+                                     Form("#sigma = %.5f #pm %.5f", fit.sigma, fit.sigmaError));
                 curve->Write();
             }
-            legend.Draw();
             drawHeader(charge, bin, results[iz][bin].entries);
             canvas.RedrawAxis();
             printPage(canvas, pdf, bin, kNBetaBins);
@@ -309,9 +331,9 @@ void plotHybridComparison(const char *inputDir = "results/comparison",
         for (int iz = 0; iz < kNCharges; ++iz)
         {
             canvas.Clear();
-            canvas.SetLeftMargin(0.11);
+            canvas.SetLeftMargin(0.14);
             canvas.SetRightMargin(0.04);
-            canvas.SetBottomMargin(0.12);
+            canvas.SetBottomMargin(0.16);
             canvas.SetTopMargin(0.12);
 
             double x[kNBetaBins] = {};
@@ -371,7 +393,8 @@ void plotHybridComparison(const char *inputDir = "results/comparison",
             frame.GetXaxis()->SetTitle("#beta_{MC}");
             frame.GetYaxis()->SetTitle(summary == 0 ? "Gaussian core #sigma[1/#beta]" :
                                        summary == 1 ? "Gaussian core #mu[1/#beta]" :
-                                                      "#sigma improvement over Hybrid [%]");
+                                                      Form("#sigma improvement over %s [%%]", baselineLabel));
+            styleAxes(frame);
             frame.SetMinimum(frameLow);
             frame.SetMaximum(frameHigh);
             frame.Draw("AXIS");
@@ -407,7 +430,7 @@ void plotHybridComparison(const char *inputDir = "results/comparison",
                 styleGraph(line, 0);
                 band->Draw("3 SAME");
                 line->Draw("L SAME");
-                legend.AddEntry(line, "New vs Hybrid", "l");
+                legend.AddEntry(line, candidateLabel, "l");
                 graphCleanup.push_back(band);
                 graphCleanup.push_back(line);
             }

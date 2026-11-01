@@ -1,5 +1,10 @@
 # New estimator vs physical Hybrid
 
+**Historical supervised result (2026-09-13).** This document and
+`results/comparison/` describe the former MC-truth-trained regressor. That
+training method was replaced on 2026-09-19. These gains do not apply to the
+current flight-trained model; see [detector-only training](detector-only-training.md).
+
 ## Scope
 
 This is the main betaEstimator performance comparison. It does not plot the total beta spectrum and it does not use scatter plots.
