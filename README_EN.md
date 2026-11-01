@@ -1,130 +1,76 @@
-<div align="center">
-  <h1>Research on Non-linear Reconstruction Method for Particle Velocity in AMS Time-of-Flight Detector</h1>
-  
-  [![English](https://badgen.net/badge/Language/English/blue?icon=github)](README_EN.md) [![简体中文](https://badgen.net/badge/语言/简体中文/red?icon=github)](README.md)
-</div>
+# Nonlinear particle velocity reconstruction for AMS TOF
 
-## Project Introduction
+Reconstruct particle velocity at the AMS center or before TOF from four timing measurements. The original nonlinear model converts measured TOF and Tracker deposits into propagation losses. Hybrid combines a charge-aware material mean with a correction based on centered measured deposits.
 
-This project aims to study the non-linear reconstruction method for particle velocity in the Time-of-Flight (TOF) detector of the Alpha Magnetic Spectrometer (AMS). AMS is a particle physics experiment operating on the International Space Station, and the TOF detector is used to measure the flight direction and velocity of charged particles. However, due to ionization energy loss of charged particles in TOF materials, particles decelerate. Using a linear function to fit the time-space relationship of particles leads to certain biases in velocity reconstruction, particularly noticeable at low energies.
+## Build and run
 
-This research introduces particle energy loss terms in the velocity fitting process, implementing non-linear fitting to reduce reconstruction bias and improve precision. This will help AMS more accurately identify nuclear isotopes.
-
-## Features
-
-- Particle motion simulation and energy loss calculation
-- Linear and non-linear particle velocity reconstruction methods
-- Magnetic field data visualization and analysis
-- Energy loss correction models
-- Beta (velocity/speed of light) comparison analysis tools
-
-## Software Architecture
-
-This project is developed based on the ROOT framework and includes the following components:
-
-- `ParticleData`: Particle data structure definitions
-- `ParticlePropagator`: Particle propagation algorithm implementation
-- `BetaFitter`: Core class for particle velocity fitting
-- `macro`: Data analysis and visualization scripts
-
-## Installation and Usage
-
-### System Requirements
-- Linux operating system
-- ROOT 5.34+ (ROOT 6.x supported)
-- Compiler with C++11 standard support (gcc or icpx)
-
-### Compilation Steps
-
-1. Standard compilation:
-```bash
-./build.csh
-```
-
-2. Debug mode compilation:
-```bash
-./build.csh debug
-```
-
-3. Clean compilation files:
-```bash
-./build.csh clean
-```
-
-### Running Examples
+On sdiat, from the project directory:
 
 ```bash
-./run.csh [input_file] [output_file] [parameters]
-```
-
-Or use the local processing script:
-```bash
-./run_local.sh
-```
-
-The seventh argument selects the beta reconstruction reference point: `center`
-means the AMS center between S2 and S3 (default), while `before_tof` means the
-point immediately before the particle enters TOF:
-
-```bash
+./build.sh
 ./run.sh input.root output.root 0 1.9 1.0 all center
-./run.sh input.root output.root 0 1.9 1.0 all before_tof
 ```
 
-The TOF and tracker energy-loss scales are independent. The tracker scale is
-the fifth argument and defaults to `1.0`:
+`build.sh` and `run.sh` load the AMSVX/ROOT5 environment through `/home/ams/hxwu/AMSSoft/AMSVX_TOFBetaFit_el9/amsroot_TOFBetaFit.sh`. Use ROOT6 from a clean shell for merging and plotting. `./build.sh debug` and `./build.sh clean` select the other build modes.
+
+External dependencies are AMSVX, the AMS data directory, and its `LAPP/dEdxPDF/g4mscan.root` material map. Inputs are `amstreea` ntuples. `input_Z*.list` and `config/*.sources` retain source paths; raw ROOT data and the AMS software are stored separately from the code archive.
+
+```text
+./run.sh input output [option=0] [tofScale=1] [trackerScale=1]
+  [scaleMode=all] [reference=center] [scaleConfig=none]
+  [hybridConfig=none] [materialStepCm=0]
+```
+
+- Options: `0` reconstruct, `1` fit a common loss scale at fixed MC beta, `2` benchmark, `3` save beta differences, `4` export Hybrid training samples, `5` train Hybrid parameters, `-1/-2` export field/loss information.
+- `tofScale` and `trackerScale` control the original nonlinear model. Direct executable invocation defaults to TOF scale `2`; the wrapper defaults to `1`.
+- `scaleMode`: `all` scales S1/S2/S3, `s1s2` scales S1/S2, `s2` scales S2. Other deposits retain coefficient 1.
+- `reference`: `center` or `before_tof`.
+- `scaleConfig`: three columns, `charge tofScale trackerScale`. Charges missing from the file are skipped.
+- `hybridConfig`: calibration path, or `none` to disable Hybrid.
+- `materialStepCm`: `0` for coarse propagation; positive values set the maximum z step. The formal fine configuration uses `1` cm.
+
+The output `betaTree` contains `linearBeta`, Tracker-aware `nonlinearBeta`, old TOF-only `nonlinearBetaLegacy`, `hybridBeta`, Hybrid status/chi-square/step count, `mcBeta`, rigidity fields, and reconstructed/MC charges. Disabled Hybrid produces NaN beta and status -1.
+
+## Physical-boundary Hybrid
 
 ```bash
-./run.sh input.root output.root 0 1.9 1.2 all center
+./run.sh input.root beta.root 0 1 1 all center \
+  config/energy_loss_scales_center_common_z1268.conf \
+  config/hybrid_material_fine.conf 1
 ```
 
-For charge-dependent production scales, pass a three-column configuration file
-as the eighth argument. The columns are `charge`, `TOF scale`, and
-`tracker scale`; charges absent from the file are skipped. For example:
+The regional model is:
+
+```text
+loss = materialScale * materialMean
+     + fluctuationScale * (measuredDeposit - meanDeposit)
+```
+
+`materialMean` includes projectile-charge Z². For downward particles, the four calibration regions are S1 entrance to S2 exit; S2 exit to L5 at z=1.698 cm; L5 to S3 entrance; and S3 entrance to the post-S4 acceptance plane at z=-69.975 cm. TOF surfaces follow the event's hit bars. The last endpoint includes material downstream of S4.
+
+The deposit variables are S1+S2; L2+L3+L4+half L5; half L5+L6+L7+L8; and S3+S4. Material integration follows native map cells and detector nodes. Each event fits inverse beta and one common time offset. The fine calibration has 128 rows: four charges, four regions, and eight local-beta bins.
 
 ```bash
-./run.sh input.root output.root 0 1.0 1.0 all center config/energy_loss_scales_center_common_20260805_z268.conf
+./run.sh input.root training_part.root 4 1 1 all center none none 1
+find hybrid_training_parts -name '*.root' | sort > training.list
+./run.sh training.list config/hybrid_material_fine.conf 5
 ```
 
-Option `1` fixes `mcBeta` and jointly fits one common energy-loss scale applied
-to both TOF and tracker deposits, together with the common time offset for each
-MC event:
+The training tree retains boundary audit fields and primary L5 truth. Historical comparison output `mcBeta` uses acceptance checkpoint 10. See [the full method and results](docs/hybrid-material-fine.md). The coarse configuration with the historical `20260904` filename has also been retrained with physical boundaries.
 
-```bash
-./run.sh input.root per_event_scale.root 1 2 1 all center
-```
+## Results and research
 
-The output `scaleTree` stores `energyLossScale`, `timeOffset`, `chi2`,
-`fitStatus`, and `fitValid`, so failed fits remain
-distinguishable from valid results.
+Current physical-boundary plots: `macro/results/beta_comparison/hybrid_material_physical*`. Validation data: `results/hybrid_physical_20260913/merged/`. Old `hybrid_material_fine*` plots describe the earlier fixed-boundary prototype.
 
-## Data Analysis
+Common validation counts for Z1/Z2/Z6/Z8 are 193,655 / 118,554 / 45,894 / 24,747. For residual `1/beta_reco - 1/beta_MC`, Hybrid improves low-beta core means for Z1/Z2 and produces small negative means for Z6/Z8. Core widths remain close to the original nonlinear model.
 
-The project provides various data analysis and visualization tools:
+Use `macro/plotChargeBetaComparison.C` with the four charge-specific merged files under ROOT6. The complete command and numerical tables are in [the Chinese README](README.md) and [the Hybrid note](docs/hybrid-material-fine.md).
 
-Plots are stored under `macro/results/<analysis-category>/` by default. For
-example, beta comparisons go to `macro/results/beta_comparison/`, while energy
-loss plots go to `macro/results/energy_loss/`. The `outputName` argument still
-accepts an explicit output path when needed.
+- `docs/energy-loss-scale-scope.md`: cumulative-loss explanation and paired scale-scope tests.
+- `research/zeta_study_20260722/`: global scale fits and timing-kernel decomposition.
+- `research/nonlinear_bias_decomposition_20260802/`: propagation and cluster-time bias decomposition.
+- `research/real_data_validation_20260722/`: blind four-layer, disjoint-pair, RICH, and leave-one-out tests.
 
-### Beta Comparison Analysis
+Research sources, notes, and compact numerical summaries are versioned. Generated ROOT files, plots, binaries, and batch logs remain outside the code snapshot. `ref/LxBetalhd.*` is an external implementation reference; production uses the AMSVX interfaces.
 
-```bash
-root -l 'macro/plotBetaComparison.C("test.root")'
-```
-
-### Energy Loss Analysis
-
-```bash
-root -l 'macro/plotEnergyLoss.C("test_el.root")'
-```
-
-### Magnetic Field Analysis
-
-```bash
-root -l 'macro/plotMagneticField.C(0.0, 0.0, "test.root")'
-```
-
-## Results Analysis
-
-The project demonstrates significant precision improvement with the non-linear method at lower β values through residual analysis comparing linear and non-linear velocity reconstruction methods. Research shows that energy loss of charged particles in detector materials produces systematic biases in velocity measurements, which can be significantly improved by introducing energy loss correction terms.
+`run_local.sh` retains its existing eight-argument interface for Linear/Nonlinear. For Hybrid batches, call `run.sh` per file. The later independent estimator is maintained in the neighboring `betaEstimator` project.
