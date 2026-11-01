@@ -1,0 +1,5 @@
+all n=6832017 mean=1.322398 median=1.315098 q16=1.021938 q84=1.564459 mode_bin=1.375 mode_count=132529
+S1S2_unoverlap n=5747834 mean=1.295929 median=1.291593 q16=1.011637 q84=1.515161 mode_bin=1.375 mode_count=116037
+S1S2_overlap n=1084183 mean=1.462724 median=1.434036 q16=1.105512 q84=1.787081 mode_bin=1.395 mode_count=16598
+beta<.7_unoverlap n=498755 mean=1.465928 median=1.466487 q16=1.243097 q84=1.653878 mode_bin=1.595 mode_count=10709
+beta<.7_overlap n=93595 mean=1.656362 median=1.647736 q16=1.314228 q84=1.948964 mode_bin=1.635 mode_count=1473

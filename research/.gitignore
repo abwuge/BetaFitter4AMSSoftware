@@ -1,0 +1,18 @@
+# Keep research sources, notes, and compact numerical summaries.
+*
+!.gitignore
+!*/
+!*/README.md
+!*/src/
+!*/src/*.cpp
+!*/src/*.C
+!*/src/*.inc
+!*/results/
+!*/results/*.csv
+!*/results/*.txt
+!real_data_validation_20260722/results/disjoint_pair_blind_center_global/
+!real_data_validation_20260722/results/disjoint_pair_blind_center_global/*.csv
+!real_data_validation_20260722/results/four_layer_blind_center_global/
+!real_data_validation_20260722/results/four_layer_blind_center_global/*.csv
+!real_data_validation_20260722/results/four_layer_blind_final/
+!real_data_validation_20260722/results/four_layer_blind_final/*.csv

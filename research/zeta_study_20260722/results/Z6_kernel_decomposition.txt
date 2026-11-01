@@ -1,0 +1,13 @@
+list=input_Z6.list files=100 raw=4165950 good=448528 badloss=0
+[ALL]
+beta<0.5 n=0 S1_bracket=0 gap_S1S2=0 S2_bracket=0 S2_to_L2=0 inner_tracker_magnet=0 S3_bracket=0 gap_S3S4=0 S4_bracket=0 total=0
+beta<0.6 n=38597 S1_bracket=0.30646638 gap_S1S2=0.43416187 S2_bracket=0.32281973 S2_to_L2=0.53988415 inner_tracker_magnet=0.42637836 S3_bracket=0.0053020351 gap_S3S4=0.0031092829 S4_bracket=0.00018557129 total=2.0383074
+beta<0.7 n=135232 S1_bracket=0.30891575 gap_S1S2=0.4398475 S2_bracket=0.322063 S2_to_L2=0.54373108 inner_tracker_magnet=0.41812668 S3_bracket=0.0050409818 gap_S3S4=0.0029031036 S4_bracket=0.00016516273 total=2.0407933
+beta<0.8 n=262941 S1_bracket=0.30924269 gap_S1S2=0.4402282 S2_bracket=0.3217025 S2_to_L2=0.54326115 inner_tracker_magnet=0.41642088 S3_bracket=0.0049964462 gap_S3S4=0.0028702252 S4_bracket=0.00016234432 total=2.0388844
+beta<0.9 n=448528 S1_bracket=0.3092804 gap_S1S2=0.44024273 S2_bracket=0.32164778 S2_to_L2=0.54316219 inner_tracker_magnet=0.41618266 S3_bracket=0.0049905597 gap_S3S4=0.0028659117 S4_bracket=0.00016199248 total=2.0385342
+[QS1111]
+beta<0.5 n=0 S1_bracket=0 gap_S1S2=0 S2_bracket=0 S2_to_L2=0 inner_tracker_magnet=0 S3_bracket=0 gap_S3S4=0 S4_bracket=0 total=0
+beta<0.6 n=28723 S1_bracket=0.29883037 gap_S1S2=0.42813188 S2_bracket=0.31643076 S2_to_L2=0.53617586 inner_tracker_magnet=0.42569094 S3_bracket=0.0051844232 gap_S3S4=0.0030676737 S4_bracket=0.00018075387 total=2.0136927
+beta<0.7 n=98395 S1_bracket=0.30004527 gap_S1S2=0.43303472 S2_bracket=0.314527 S2_to_L2=0.53990212 inner_tracker_magnet=0.41741562 S3_bracket=0.0049178391 gap_S3S4=0.0028570157 S4_bracket=0.0001607033 total=2.0128603
+beta<0.8 n=190624 S1_bracket=0.30025764 gap_S1S2=0.4332598 S2_bracket=0.31407673 S2_to_L2=0.53947721 inner_tracker_magnet=0.41574263 S3_bracket=0.0048731335 gap_S3S4=0.0028239607 S4_bracket=0.00015793658 total=2.0106691
+beta<0.9 n=324630 S1_bracket=0.3002814 gap_S1S2=0.43326644 S2_bracket=0.31400969 S2_to_L2=0.53938416 inner_tracker_magnet=0.41551014 S3_bracket=0.0048673003 gap_S3S4=0.0028196679 S4_bracket=0.00015759389 total=2.0102964

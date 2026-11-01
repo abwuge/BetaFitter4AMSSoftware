@@ -1,0 +1,55 @@
+species,beta_bin_center,quantity,value,unit
+He4,0.375,production_linear,0.003955743491,1/beta residual
+He4,0.375,production_nonlinear,0.001483553715,1/beta residual
+He4,0.375,current_truth,0.01802940984,1/beta residual
+He4,0.375,oracle_measured,-0.01778706446,1/beta residual
+He4,0.375,tof_betahmc,0.005436173346,1/beta residual
+He4,0.375,robust_minus_production_nonlinear,1.609266013e-05,1/beta residual
+He4,0.375,current_minus_truth_S1S2,4.963246569,ps
+He4,0.375,current_minus_truth_S2S3,-79.89173878,ps
+He4,0.375,current_minus_truth_S3S4,-5.886972242,ps
+He4,0.375,measured_minus_truth_S1S2,-4.66493074,ps
+He4,0.375,measured_minus_truth_S2S3,-72.73162002,ps
+He4,0.375,measured_minus_truth_S3S4,-6.558518265,ps
+He4,0.375,truth_dE_upper_MeV,60.53505534,MeV
+He4,0.375,tk_active_upper_MeV,8.856573701,MeV
+He4,0.375,truth_over_active_upper,6.812826116,ratio
+He4,0.375,truth_dE_lower_MeV,60.58742762,MeV
+He4,0.375,tk_active_lower_MeV,7.01304543,MeV
+He4,0.375,truth_over_active_lower,8.768166851,ratio
+C12,0.525,production_linear,-0.0007090471,1/beta residual
+C12,0.525,production_nonlinear,-0.001920434858,1/beta residual
+C12,0.525,current_truth,0.009044700305,1/beta residual
+C12,0.525,oracle_measured,-0.01109937562,1/beta residual
+C12,0.525,tof_betahmc,0.0009779570376,1/beta residual
+C12,0.525,robust_minus_production_nonlinear,3.201577369e-06,1/beta residual
+C12,0.525,current_minus_truth_S1S2,3.692057815,ps
+C12,0.525,current_minus_truth_S2S3,-39.20006943,ps
+C12,0.525,current_minus_truth_S3S4,-3.592350705,ps
+C12,0.525,measured_minus_truth_S1S2,-4.982733260000001,ps
+C12,0.525,measured_minus_truth_S2S3,-42.09055459,ps
+C12,0.525,measured_minus_truth_S3S4,-6.239261899,ps
+C12,0.525,truth_dE_upper_MeV,326.9428465,MeV
+C12,0.525,tk_active_upper_MeV,38.73721552,MeV
+C12,0.525,truth_over_active_upper,8.645131702,ratio
+C12,0.525,truth_dE_lower_MeV,319.1227686,MeV
+C12,0.525,tk_active_lower_MeV,30.01894426,MeV
+C12,0.525,truth_over_active_lower,11.15726274,ratio
+O16,0.525,production_linear,-0.002022019803,1/beta residual
+O16,0.525,production_nonlinear,-0.003944625078,1/beta residual
+O16,0.525,current_truth,0.01321796997,1/beta residual
+O16,0.525,oracle_measured,-0.01655758946,1/beta residual
+O16,0.525,tof_betahmc,0.00206074163,1/beta residual
+O16,0.525,robust_minus_production_nonlinear,8.60131909e-06,1/beta residual
+O16,0.525,current_minus_truth_S1S2,4.078613949,ps
+O16,0.525,current_minus_truth_S2S3,-56.02145018,ps
+O16,0.525,current_minus_truth_S3S4,-4.653492728,ps
+O16,0.525,measured_minus_truth_S1S2,-10.52828001,ps
+O16,0.525,measured_minus_truth_S2S3,-64.50412844,ps
+O16,0.525,measured_minus_truth_S3S4,-11.697255329999999,ps
+O16,0.525,truth_dE_upper_MeV,561.725808,MeV
+O16,0.525,tk_active_upper_MeV,68.15337229,MeV
+O16,0.525,truth_over_active_upper,8.514933127,ratio
+O16,0.525,truth_dE_lower_MeV,592.535334,MeV
+O16,0.525,tk_active_lower_MeV,53.63745499,MeV
+O16,0.525,truth_over_active_lower,11.58701132,ratio

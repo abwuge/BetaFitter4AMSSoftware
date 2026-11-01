@@ -1,0 +1,10 @@
+files=20
+raw=610746
+selected=106789
+valid=18282
+paired=106789
+pair_mismatch=0
+current_measured_fail=0
+current_truth_fail=0
+oracle_measured_fail=0
+oracle_truth_fail=0

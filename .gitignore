@@ -1,5 +1,9 @@
 # Ignore build files
 build/*
+*.so
+*.d
+*.pcm
+*.o
 
 # Ignore GitHub Copilot prompts
 .github/prompts/*
