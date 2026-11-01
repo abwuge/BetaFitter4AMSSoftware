@@ -1,0 +1,11 @@
+# build artifacts
+*.so
+*.d
+*_C.*
+
+# generated analysis outputs
+results/
+
+# Python bytecode
+__pycache__/
+*.pyc
